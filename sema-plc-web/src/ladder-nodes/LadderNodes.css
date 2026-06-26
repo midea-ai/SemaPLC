@@ -1,0 +1,451 @@
+/**
+ * Ladder Logic Node Styles
+ * Uses Tailwind CSS theme variables
+ */
+
+/* Base node styles */
+.ladder-node {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 4px;
+  background: var(--color-elevated);
+  border: 2px solid var(--color-toolbar);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  color: var(--color-foreground);
+  min-width: 60px;
+  position: relative;
+}
+
+.ladder-node.selected {
+  border-color: var(--color-accent);
+  box-shadow: var(--shadow-glow);
+}
+
+.ladder-node .node-label {
+  margin-top: 4px;
+  font-size: 10px;
+  color: var(--color-info);
+  max-width: 80px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Handles */
+.ladder-handle {
+  width: 10px;
+  height: 10px;
+  background: var(--color-accent);
+  border: 2px solid color-mix(in srgb, var(--color-accent) 70%, transparent);
+}
+
+.ladder-handle:hover {
+  background: var(--color-accent-hover);
+}
+
+/* ============================================================================
+   Contact Node
+   ============================================================================ */
+
+.contact-node {
+  min-width: 70px;
+}
+
+.contact-body {
+  display: flex;
+  align-items: center;
+  height: 32px;
+}
+
+.contact-rail {
+  width: 8px;
+  height: 24px;
+  border: 2px solid var(--color-foreground);
+}
+
+.contact-rail.left {
+  border-right: none;
+}
+
+.contact-rail.right {
+  border-left: none;
+}
+
+.contact-center {
+  width: 20px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.contact-symbol {
+  font-weight: bold;
+  font-size: 14px;
+  color: var(--color-destructive);
+}
+
+/* NO contact - empty center */
+.contact-node.no .contact-symbol {
+  color: transparent;
+}
+
+/* NC contact - diagonal line */
+.contact-node.nc .contact-center {
+  position: relative;
+}
+
+.contact-node.nc .contact-center::before {
+  content: '';
+  position: absolute;
+  width: 2px;
+  height: 28px;
+  background: var(--color-foreground);
+  transform: rotate(-30deg);
+}
+
+/* Edge detection contacts */
+.contact-node.p .contact-symbol,
+.contact-node.n .contact-symbol {
+  color: var(--color-syntax-literal);
+}
+
+/* ============================================================================
+   Coil Node
+   ============================================================================ */
+
+.coil-node {
+  min-width: 60px;
+}
+
+.coil-body {
+  display: flex;
+  align-items: center;
+  height: 32px;
+  font-size: 20px;
+  font-weight: 300;
+}
+
+.coil-left,
+.coil-right {
+  color: var(--color-foreground);
+}
+
+.coil-center {
+  width: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.coil-symbol {
+  font-size: 12px;
+  font-weight: bold;
+}
+
+/* Set coil */
+.coil-node.set .coil-symbol {
+  color: var(--color-syntax-type);
+}
+
+/* Reset coil */
+.coil-node.reset .coil-symbol {
+  color: var(--color-destructive);
+}
+
+/* Transition coils */
+.coil-node.positive .coil-symbol,
+.coil-node.negative .coil-symbol {
+  color: var(--color-syntax-literal);
+}
+
+/* ============================================================================
+   Timer Node
+   ============================================================================ */
+
+.timer-node {
+  min-width: 100px;
+  padding: 0;
+}
+
+.timer-body {
+  width: 100%;
+  background: var(--color-background);
+  border-radius: 2px;
+}
+
+.timer-header {
+  background: var(--color-node-ton);
+  color: white;
+  padding: 4px 8px;
+  font-weight: bold;
+  text-align: center;
+  border-radius: 2px 2px 0 0;
+}
+
+.timer-node.ton .timer-header {
+  background: var(--color-node-ton);
+}
+
+.timer-node.tof .timer-header {
+  background: var(--color-node-tof);
+}
+
+.timer-node.tp .timer-header {
+  background: var(--color-node-tp);
+}
+
+.timer-instance {
+  padding: 4px 8px;
+  font-size: 11px;
+  color: var(--color-info);
+  text-align: center;
+  border-bottom: 1px solid var(--color-toolbar);
+}
+
+.timer-params {
+  padding: 4px 8px;
+}
+
+.timer-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 10px;
+  color: var(--color-muted);
+  line-height: 1.6;
+}
+
+.timer-pin-label.right {
+  text-align: right;
+}
+
+.timer-value {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--color-success);
+  background: var(--color-background);
+  padding: 1px 4px;
+  border-radius: 2px;
+  min-width: 30px;
+  text-align: center;
+}
+
+.timer-value.active {
+  color: var(--color-syntax-type);
+  background: color-mix(in srgb, var(--color-syntax-type) 15%, var(--color-background));
+}
+
+.timer-preset {
+  padding: 4px 8px;
+  font-size: 10px;
+  color: var(--color-success);
+  text-align: center;
+  background: var(--color-surface);
+  border-radius: 0 0 2px 2px;
+}
+
+.timer-handle {
+  width: 8px;
+  height: 8px;
+}
+
+/* ============================================================================
+   Counter Node
+   ============================================================================ */
+
+.counter-node {
+  min-width: 100px;
+  padding: 0;
+}
+
+.counter-body {
+  width: 100%;
+  background: var(--color-background);
+  border-radius: 2px;
+}
+
+.counter-header {
+  background: var(--color-node-ctu);
+  color: white;
+  padding: 4px 8px;
+  font-weight: bold;
+  text-align: center;
+  border-radius: 2px 2px 0 0;
+}
+
+.counter-node.ctu .counter-header {
+  background: var(--color-node-ctu);
+}
+
+.counter-node.ctd .counter-header {
+  background: var(--color-node-ctd);
+}
+
+.counter-node.ctud .counter-header {
+  background: var(--color-node-ctud);
+}
+
+.counter-instance {
+  padding: 4px 8px;
+  font-size: 11px;
+  color: var(--color-info);
+  text-align: center;
+  border-bottom: 1px solid var(--color-toolbar);
+}
+
+.counter-params {
+  padding: 4px 8px;
+}
+
+.counter-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  color: var(--color-muted);
+  line-height: 1.6;
+}
+
+.counter-pin-label.right {
+  text-align: right;
+}
+
+.counter-preset {
+  padding: 4px 8px;
+  font-size: 10px;
+  color: var(--color-success);
+  text-align: center;
+  background: var(--color-surface);
+  border-radius: 0 0 2px 2px;
+}
+
+.counter-handle {
+  width: 8px;
+  height: 8px;
+}
+
+/* ============================================================================
+   Power Rail Node
+   ============================================================================ */
+
+.power-rail-node {
+  width: 12px;
+  min-width: 12px;
+  height: 80px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+}
+
+.rail-line {
+  width: 4px;
+  height: 100%;
+  background: var(--color-foreground);
+}
+
+.power-rail-node.left .rail-line {
+  background: var(--color-destructive);
+}
+
+.power-rail-node.right .rail-line {
+  background: var(--color-info);
+}
+
+.rail-handle {
+  width: 8px;
+  height: 8px;
+}
+
+/* ============================================================================
+   Comparator Node
+   ============================================================================ */
+
+.comparator-node {
+  min-width: 120px;
+  padding: 6px 8px;
+}
+
+.comparator-body {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 32px;
+  padding: 4px 8px;
+  background: var(--color-background);
+  border: 1px solid var(--color-info);
+  border-radius: var(--radius-sm);
+}
+
+.comparator-operand {
+  font-size: 11px;
+  color: var(--color-info);
+  max-width: 60px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.comparator-operator {
+  font-size: 12px;
+  font-weight: bold;
+  color: var(--color-syntax-literal);
+  padding: 0 2px;
+}
+
+/* ============================================================================
+   Power Flow Animation
+   ============================================================================ */
+
+.ladder-node.powered {
+  border-color: var(--color-success);
+}
+
+.ladder-node.powered .contact-rail,
+.ladder-node.powered .coil-left,
+.ladder-node.powered .coil-right {
+  color: var(--color-success);
+  border-color: var(--color-success);
+}
+
+.power-rail-node.left.powered .rail-line {
+  background: var(--color-success);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--color-success) 50%, transparent);
+}
+
+/* ============================================================================
+   Live Runtime Coloring (energized) — driven by data.live.active
+   ============================================================================ */
+
+.ladder-node.energized {
+  border-color: var(--color-success);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--color-success) 55%, transparent);
+}
+
+.ladder-node.energized .contact-rail,
+.ladder-node.energized .contact-center,
+.ladder-node.energized .coil-left,
+.ladder-node.energized .coil-right,
+.ladder-node.energized .comparator-operator {
+  color: var(--color-success);
+  border-color: var(--color-success);
+}
+
+.counter-value {
+  font-size: 9px;
+  color: var(--color-success);
+  background: var(--color-background);
+  padding: 1px 4px;
+  border-radius: 2px;
+  min-width: 24px;
+  text-align: center;
+}
+
+.counter-value.active {
+  color: var(--color-syntax-type);
+  background: color-mix(in srgb, var(--color-syntax-type) 15%, var(--color-background));
+}

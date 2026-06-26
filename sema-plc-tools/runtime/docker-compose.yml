@@ -1,0 +1,53 @@
+# OpenPLC Runtime + matiec + xml2st 一体化开发环境
+#
+# 使用：
+#   docker compose up --build -d   # 构建并启动（BuildKit 自动检测宿主架构）
+#   docker compose logs -f         # 查看启动日志
+#   docker compose down            # 停止并清理
+#
+# 构建时 Docker BuildKit 会自动注入 TARGETARCH（amd64 / arm64），
+# Dockerfile 据此拉取对应架构的 matiec / xml2st 二进制。
+
+# 钉死 compose project 名,使其不随目录名变化(产品维度重构前在 W1-D1-D2/,
+# 默认 project 名曾是 w1-d1-d2;固定后 up/down 行为稳定,不再因目录改名而孤立容器)。
+name: sema-plc-runtime
+
+services:
+  openplc-runtime:
+    build:
+      context: .
+      dockerfile: Dockerfile.plc-dev
+    image: openplc-plc-dev:latest
+    container_name: openplc-plc-dev
+    ports:
+      - "8443:8443"
+    cap_add:
+      - SYS_NICE
+      - SYS_RESOURCE
+    volumes:
+      - openplc-runtime-data:/var/run/runtime
+      - ./samples:/workspace/samples:ro
+      - ./scripts:/workspace/scripts:ro
+    environment:
+      - OPENPLC_DEBUG=1
+    # /api/ping (and /api/status) require JWT auth; healthcheck has no token.
+    # Accept any HTTP response indicating the server is up and authenticating:
+    # 200 (auth somehow worked) or 401 (no token → expected). Previously used
+    # `curl -f` which treats 401 as a hard failure (exit 22), so the container
+    # was perma-marked unhealthy even when fully functional — masking real
+    # outages and breaking any future `depends_on: condition: service_healthy`.
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - |
+          code=$$(curl -k -s -o /dev/null -w '%{http_code}' https://localhost:8443/api/status)
+          echo "$$code" | grep -qE '^(200|401)$$'
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    restart: unless-stopped
+
+volumes:
+  openplc-runtime-data:
+    driver: local

@@ -1,0 +1,26 @@
+/* 执行计划卡片 — lifted from SemaPLC design (standalone-src.html) */
+.plan-card{border:1px solid var(--line);border-radius:var(--r-card);background:#FCFCFD;
+  overflow:hidden;flex-shrink:0;animation:fadein .3s ease;}
+.plan-head{display:flex;align-items:center;gap:8px;padding:11px 14px;border-bottom:1px solid var(--line);
+  background:var(--panel);}
+.plan-gear{color:var(--text-2);display:flex;animation:spin 6s linear infinite;}
+.plan-title{font-size:13px;font-weight:700;flex:1;}
+.plan-progress{font-size:12px;font-weight:700;color:var(--brand);font-family:var(--mono);
+  background:var(--brand-soft);padding:2px 8px;border-radius:6px;}
+.plan-steps{padding:6px 8px;display:flex;flex-direction:column;}
+.plan-step{display:flex;align-items:center;gap:10px;padding:7px 8px;font-size:13px;border-radius:7px;}
+.plan-step.st-active{background:var(--brand-soft);}
+.plan-step.st-error{background:#FDECEC;}
+.step-label{flex:1;color:var(--text-1);}
+.plan-step.st-pending .step-label{color:var(--text-3);}
+.step-ic{width:17px;height:17px;border-radius:50%;flex:0 0 17px;display:flex;align-items:center;justify-content:center;}
+.step-ic.done{background:var(--ok);}
+.step-ic.error{background:var(--err);}
+.step-ic.pending{border:1.8px solid #CDD2DA;}
+.step-ic.active{border:1.8px solid var(--brand);position:relative;}
+.step-half{position:absolute;inset:-1.8px;border-radius:50%;border:1.8px solid transparent;
+  border-top-color:var(--brand);border-right-color:var(--brand);animation:spin .8s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+@keyframes fadein{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:none;}}
+.step-main{flex:1;display:flex;flex-direction:column;gap:1px;min-width:0;}
+.step-sub{font-size:11px;color:var(--text-3);font-family:var(--font);line-height:1.3;}

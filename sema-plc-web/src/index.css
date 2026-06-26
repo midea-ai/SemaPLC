@@ -1,0 +1,71 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+}
+
+/*
+ * Theme tokens consumed by the lifted ladder-logic-editor node CSS
+ * (src/ladder-nodes/LadderNodes.css). Upstream uses Tailwind v4 @theme;
+ * we run Tailwind v3 so we copy the same CSS variables verbatim here so
+ * the lifted nodes have backgrounds / borders / colors.
+ *
+ * Light theme — the lifted upstream is dark; we re-tone for a light UI.
+ */
+:root {
+  --color-background: #ffffff;
+  --color-surface: #f8fafc;
+  --color-elevated: #ffffff;
+  --color-toolbar: #94a3b8;
+
+  --color-border: #cbd5e1;
+  --color-border-subtle: #e2e8f0;
+  --color-border-accent: #93c5fd;
+
+  --color-foreground: #1e293b;
+  --color-muted: #64748b;
+  --color-muted-foreground: #94a3b8;
+
+  --color-accent: #4f46e5;
+  --color-accent-hover: #4338ca;
+  --color-accent-muted: rgba(79, 70, 229, 0.12);
+
+  --color-accent-secondary: #ef4444;
+  --color-accent-warm: #f59e0b;
+  --color-accent-warm-hover: #d97706;
+
+  --color-success: #22c55e;
+  --color-warning: #eab308;
+  --color-destructive: #ef4444;
+  --color-info: #2563eb;
+
+  --color-node-ton: #2563eb;
+  --color-node-tof: #8b5cf6;
+  --color-node-tp:  #14b8a6;
+  --color-node-ctu: #ef4444;
+  --color-node-ctd: #a78bfa;
+  --color-node-ctud:#f97316;
+
+  --color-minimap-contact: #2563eb;
+  --color-minimap-coil: #14b8a6;
+  --color-minimap-timer: #eab308;
+  --color-minimap-counter: #8b5cf6;
+  --color-minimap-comparator: #f97316;
+  --color-minimap-power-left: #ef4444;
+  --color-minimap-power-right: #2563eb;
+  --color-minimap-default: #94a3b8;
+
+  --font-sans: 'Inter', 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+  --radius-sm: 4px;
+  --shadow-glow: 0 0 12px rgba(79, 70, 229, 0.18);
+  --shadow-glow-strong: 0 0 18px rgba(79, 70, 229, 0.28);
+}
+
+/* Defensive: even when CSS vars are missing entirely, give nodes a visible default */
+.ladder-node {
+  min-height: 40px;
+  min-width: 60px;
+}

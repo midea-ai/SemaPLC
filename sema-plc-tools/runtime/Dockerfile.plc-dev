@@ -1,0 +1,132 @@
+# syntax=docker/dockerfile:1.7
+#
+# OpenPLC Runtime + matiec + xml2st 一体化开发镜像
+#
+# 架构策略：强制 linux/amd64
+#   原因：matiec 上游 v4.0.11 的 linux-arm64 release 实际打包的是 x86_64 二进制
+#         （命名错误 / 上游发布事故），在 arm64 容器里直接报 rosetta error。
+#   方案：通过 --platform=linux/amd64 让基础镜像与所有工具统一在 amd64 上运行：
+#         - Apple Silicon Mac：Docker Desktop 的 Rosetta 2 自动完成 x86_64 仿真
+#         - Linux ARM 主机：依赖 binfmt + qemu-user-static
+#         - Linux x86 / Windows x64：原生执行
+#   待 matiec 上游修复 arm64 release 后，可恢复 TARGETARCH 动态选择。
+
+# ── 安全扫描说明（accepted-risk / by-design）────────────────────────────────
+# 静态扫描会对本 Dockerfile 报两类项，均为本地开发运行时的有意取舍,不做"字面修复":
+#   1) Dependency Confusion(未钉 apt 版本 / openplc-runtime-matiec:main 本地 tag):
+#      openplc-runtime-matiec 是本机自建的前置镜像(scripts/build-matiec-base.sh,已钉死
+#      上游 commit),非公共 registry 拉取,不存在依赖混淆面;apt 钉死版本会在基础镜像 repo
+#      更新时破坏构建。rusty 已改为按 tag 从公开源构建(见下),可复现。
+#   2) Default User Privilege(无 USER,默认 root):OpenPLC Runtime 需 root + SYS_NICE/
+#      SYS_RESOURCE 设实时调度优先级(compose cap_add),改非 root 会令 start_openplc.sh 失败。
+# 该镜像仅用于本地 localhost 开发,不应部署到公网。
+# ────────────────────────────────────────────────────────────────────────────
+
+# rusty 构建 stage：从公开源 PLC-lang/rusty 按 tag 构建 `plc`(仅供 plc_check 自检)。
+#   过去从私有 benchmark 镜像 a4p-bench COPY,外部无法获得 → 改为自建,自包含可复现。
+#   rusty v0.5.0 依赖 LLVM 21(llvm-sys 211 / inkwell llvm21-1);bookworm 默认源无 LLVM 21,
+#   故经官方 apt.llvm.org 安装,ENV LLVM_SYS_211_PREFIX 指向 /usr/lib/llvm-21。
+FROM --platform=linux/amd64 rust:1-bookworm AS rusty
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        git cmake wget gnupg lsb-release ca-certificates software-properties-common \
+        zlib1g-dev libzstd-dev libffi-dev libtinfo-dev \
+    && wget -qO /tmp/llvm.sh https://apt.llvm.org/llvm.sh \
+    && chmod +x /tmp/llvm.sh && /tmp/llvm.sh 21 \
+    && apt-get install -y --no-install-recommends llvm-21 llvm-21-dev libpolly-21-dev \
+    && rm -rf /var/lib/apt/lists/*
+ENV LLVM_SYS_211_PREFIX=/usr/lib/llvm-21
+ENV PATH=/usr/lib/llvm-21/bin:$PATH
+RUN git clone --depth 1 --branch v0.5.0 https://github.com/PLC-lang/rusty.git /opt/rusty
+WORKDIR /opt/rusty
+RUN cargo build --release --bin plc && ./target/release/plc --version
+
+# 基础镜像：从上游源码构建的 amd64 MatIEC OpenPLC Runtime（钉死 commit）。
+#
+# ⚠️ 不要改回 ghcr.io/autonomy-logic/openplc-runtime:latest。
+#   上游把 `:latest`（及全部 SHA tag）切到了 STruC++ 分支（v4.1.0-rc3）：compile.sh
+#   显式拒收 MatIEC 产物（Config0.c / glueVars.c），plc_buildAndRun / plc_upload
+#   整条 matiec 运行链路会在 GCC 阶段挂掉。
+#   MatIEC-era 的 compile.sh（走 gcc Config0.c→new_libplc.so）只在切换前的提交里有，
+#   故 scripts/build-matiec-base.sh 已把 openplc-runtime 钉死到 commit f1a70e9，
+#   先运行它自建基础镜像：
+#     ./scripts/build-matiec-base.sh        # → openplc-runtime-matiec:main
+#     docker compose up -d --build          # 再构建本镜像（已自包含，无需 a4p-bench）
+FROM --platform=linux/amd64 openplc-runtime-matiec:main
+
+# 工具版本（统一管理，便于升级）
+ARG MATIEC_VERSION=v4.0.11
+ARG XML2ST_VERSION=v4.0.3
+
+# 安装基础依赖（file 用于二进制架构诊断）
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        curl \
+        zip \
+        unzip \
+        jq \
+        file \
+        ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# 安装 matiec（iec2c, iec2iec）+ matiec lib 头文件
+RUN set -eux; \
+    mkdir -p /tmp/matiec /usr/local/share/matiec; \
+    curl -fsSL "https://github.com/Autonomy-Logic/matiec/releases/download/${MATIEC_VERSION}/matiec-linux-x64.tar.gz" \
+        | tar xz -C /tmp/matiec --strip-components=1; \
+    install -m 0755 /tmp/matiec/iec2c   /usr/local/bin/iec2c; \
+    install -m 0755 /tmp/matiec/iec2iec /usr/local/bin/iec2iec; \
+    cp -r /tmp/matiec/lib /usr/local/share/matiec/lib; \
+    rm -rf /tmp/matiec; \
+    file /usr/local/bin/iec2c
+
+# 安装 xml2st
+RUN set -eux; \
+    mkdir -p /tmp/xml2st; \
+    curl -fsSL "https://github.com/Autonomy-Logic/xml2st/releases/download/${XML2ST_VERSION}/xml2st-linux-x64.tar.gz" \
+        | tar xz -C /tmp/xml2st --strip-components=1; \
+    install -m 0755 /tmp/xml2st/xml2st /usr/local/bin/xml2st; \
+    rm -rf /tmp/xml2st; \
+    xml2st --help >/dev/null
+
+# 安装 rusty (PLC-lang/rusty) 的 plc —— 仅供 plc_check 自检。
+# 从上面的 rusty 构建 stage COPY 自建二进制 + 仓内 StandardFunctions stdlib
+# (libs/stdlib/iec61131-st 即 plc --check 需要的 *.st)。
+COPY --from=rusty /opt/rusty/target/release/plc /usr/local/bin/plc
+COPY --from=rusty /opt/rusty/libs/stdlib/iec61131-st /opt/iec61131-stdlib
+RUN /usr/local/bin/plc --version
+
+# 工作空间目录
+RUN mkdir -p /workspace/samples /workspace/scripts /workspace/output /workspace/templates
+
+# 空 c_blocks_code.cpp 模板（Runtime 编译要求该文件必须存在）
+RUN printf '// Auto-generated empty C blocks template\nextern "C" {\n    // No custom C/C++ function blocks defined\n}\n' \
+        > /workspace/templates/c_blocks_code_empty.cpp
+
+# 复制脚本
+COPY scripts/verify_environment.sh /workspace/scripts/
+COPY scripts/plc_build.sh          /workspace/scripts/
+RUN chmod +x /workspace/scripts/*.sh
+
+# 验证工具安装完成（跳过 matiec 编译测试避免库文件版本冲突）
+RUN set -eux; \
+    xml2st --help >/dev/null; \
+    gcc --version >/dev/null; \
+    echo "OK: xml2st + GCC ready, matiec to be tested at runtime"
+
+WORKDIR /workdir
+
+# ── per-scan recorder plugin ────────────────────────────────────────────────
+COPY plugins/recorder/recorder.c /workdir/recorder.c
+COPY plugins/recorder/apply-0x46-patch.sh /tmp/apply-0x46-patch.sh
+RUN sh /tmp/apply-0x46-patch.sh \
+ && cmake --build /workdir/build --target plc_main \
+ && gcc -fPIC -shared -Wall -Werror \
+      -I/workdir/core/src/drivers -I/workdir/core/src/lib \
+      -o /workdir/librecorder.so /workdir/recorder.c \
+ && echo '{}' > /workdir/recorder.json \
+ && grep -q '^recorder,' /workdir/plugins.conf \
+      || echo 'recorder,./librecorder.so,1,1,./recorder.json' >> /workdir/plugins.conf
+
+CMD ["bash", "./start_openplc.sh"]
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD curl -k -f https://localhost:8443/api/ping || exit 1

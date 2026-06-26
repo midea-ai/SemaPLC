@@ -1,0 +1,24 @@
+{
+  "mcpServers": {
+    "plc-tools": {
+      "transport": "stdio",
+      "command": "node",
+      "args": [
+        "__PLC_TOOLS_CLI__",
+        "serve",
+        "--lite"
+      ],
+      "env": {
+        "PLC_URL": "https://localhost:8443",
+        "PLC_CONTAINER": "openplc-plc-dev",
+        "PLC_USER": "admin",
+        "PLC_PASSWORD": "admin123",
+        "PLC_STATE_FILE": "__WORKSPACE__/.plc-vis/state.json",
+        "PLC_SCENE_FILE": "__WORKSPACE__/config/scene.json",
+        "PLC_IO_MAP_FILE": "__WORKSPACE__/config/io_map.yaml",
+        "PLC_WORKSPACE": "__WORKSPACE__"
+      },
+      "description": "PLC compile/upload/run/debug tools backed by OpenPLC Runtime v4"
+    }
+  }
+}

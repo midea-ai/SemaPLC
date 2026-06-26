@@ -1,0 +1,46 @@
+/* SemaPLC live variable table — lifted from the design's <style> block. */
+.vars-view{flex:1;overflow:auto;min-height:0;}
+.vars-table{width:100%;border-collapse:collapse;font-size:13px;}
+.vars-table th{position:sticky;top:0;background:var(--panel);text-align:left;padding:11px 16px;
+  font-size:11.5px;font-weight:600;color:var(--text-2);border-bottom:1px solid var(--line);z-index:1;}
+.vars-table td{padding:11px 16px;border-bottom:1px solid #F0F1F4;}
+.vars-table tbody tr{transition:background .4s;}
+.vars-table tbody tr.flash{background:var(--brand-soft);}
+.v-name{font-weight:600;font-family:var(--mono);}
+.v-addr,.v-type{color:var(--text-2);}
+.v-dir{font-size:11.5px;}
+.v-dir.in{color:#0369A1;}
+.v-dir.out{color:#C2410C;}
+.v-bool{font-family:var(--mono);font-weight:700;font-size:12px;padding:2px 8px;border-radius:5px;}
+.v-bool.t{color:var(--ok);background:#E9F9EF;}
+.v-bool.f{color:var(--text-3);background:#F1F2F5;}
+.v-num{font-weight:700;color:var(--brand);}
+.v-desc{color:var(--text-2);font-size:12.5px;}
+
+/* Right-align the value + force columns. */
+.vars-table th.v-col-val,.vars-table td.v-col-val{text-align:right;}
+.vars-table th.v-col-force,.vars-table td.v-col-force{text-align:right;white-space:nowrap;}
+
+/* Force-held row marker (locked variables). */
+.v-lock{color:var(--warn);margin-right:5px;}
+.vars-empty{padding:18px;text-align:center;color:var(--text-2);font-size:13px;}
+.vars-note{padding:7px 16px;font-size:11.5px;color:var(--text-3);background:#FBFBFC;
+  border-bottom:1px solid var(--line);}
+
+/* Force controls — small inline buttons tuned to brand tokens. */
+.fc{display:inline-flex;align-items:center;gap:6px;justify-content:flex-end;}
+.fc-btn{font-family:var(--mono);font-size:11px;font-weight:600;padding:3px 8px;border-radius:6px;
+  border:1px solid var(--line);background:#fff;color:var(--text-2);cursor:pointer;line-height:1;}
+.fc-btn:hover:not(:disabled){border-color:var(--brand);color:var(--text-1);}
+.fc-btn:disabled{opacity:.4;cursor:not-allowed;}
+.fc-btn.t{color:var(--ok);border-color:#CDEBD9;}
+.fc-btn.t:hover:not(:disabled){background:#E9F9EF;}
+.fc-btn.set{color:var(--brand);border-color:#CDEBD9;}
+.fc-btn.set:hover:not(:disabled){background:var(--brand-soft);}
+.fc-btn.release{color:var(--warn);border-color:#F3E3C0;}
+.fc-btn.release:hover:not(:disabled){background:#FBF3E2;}
+.fc-input{width:54px;font-family:var(--mono);font-size:11px;text-align:right;padding:3px 6px;
+  border:1px solid var(--line);border-radius:6px;outline:none;}
+.fc-input:focus{border-color:var(--brand);}
+.fc-input:disabled{opacity:.4;}
+.fc-na{color:var(--text-3);}

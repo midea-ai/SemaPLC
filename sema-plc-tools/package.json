@@ -1,0 +1,43 @@
+{
+  "name": "@sema/plc-tools",
+  "version": "0.1.0",
+  "description": "MCP stdio server for OpenPLC Runtime control",
+  "type": "module",
+  "main": "./dist/cli.js",
+  "bin": {
+    "plc-tools": "./dist/cli.js"
+  },
+  "exports": {
+    ".": "./dist/cli.js",
+    "./compiler": "./dist/compiler.js",
+    "./dist/*": "./dist/*"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/cli.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:integration": "vitest run --config vitest.integration.config.ts"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.0",
+    "axios": "^1.7.0",
+    "commander": "^12.0.0",
+    "form-data": "^4.0.0",
+    "socket.io-client": "^4.7.0",
+    "yaml": "^2.9.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "tsx": "^4.0.0",
+    "typescript": "^5.0.0",
+    "vitest": "^2.0.0"
+  }
+}

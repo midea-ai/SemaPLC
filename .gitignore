@@ -1,0 +1,47 @@
+# Dependencies
+node_modules/
+
+# macOS
+.DS_Store
+
+# Logs
+*.log
+npm-debug.log*
+
+# Editor / IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Test / coverage output
+coverage/
+.nyc_output/
+
+# Environment
+.env
+.env.local
+
+# brainstorm visual companion sessions
+.superpowers/
+
+# external reference projects / large clones — not part of this repo
+related-plc-projects/
+related-benchmarks/
+
+# 本地工具 / 运行产物
+.claude/
+.playwright-mcp/
+
+# 工作截图(不入库)
+*.png
+# 但 README logo 等需入库
+!docs/images/*
+
+# 草稿 / 临时仿真文件
+**/.review-design.md
+**/scene_draft*.json
+**/scene_*.min.json
+
+# 本地分析产物，不纳入版本库
+session-analysis/

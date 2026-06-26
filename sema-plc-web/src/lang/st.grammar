@@ -1,0 +1,418 @@
+// IEC 61131-3 Structured Text Grammar for Lezer
+// Simplified grammar to avoid token conflicts
+
+@top Program { statement* }
+
+@skip { space | LineComment | BlockComment }
+
+// ============================================================================
+// Statements
+// ============================================================================
+
+statement {
+  ProgramDecl |
+  FunctionDecl |
+  FunctionBlockDecl |
+  TypeDecl |
+  VarBlock |
+  Assignment |
+  IfStatement |
+  CaseStatement |
+  ForStatement |
+  WhileStatement |
+  RepeatStatement |
+  FunctionBlockCall |
+  ReturnStatement |
+  ExitStatement |
+  ContinueStatement
+}
+
+// ============================================================================
+// Program/Function/Function Block Declarations
+// ============================================================================
+
+ProgramDecl {
+  kw<"PROGRAM"> Identifier
+  statement*
+  kw<"END_PROGRAM">
+}
+
+FunctionDecl {
+  kw<"FUNCTION"> Identifier ":" TypeName
+  statement*
+  kw<"END_FUNCTION">
+}
+
+FunctionBlockDecl {
+  kw<"FUNCTION_BLOCK"> Identifier
+  statement*
+  kw<"END_FUNCTION_BLOCK">
+}
+
+// ============================================================================
+// Type Declarations (STRUCT, ENUM, etc.)
+// ============================================================================
+
+TypeDecl {
+  kw<"TYPE">
+  (StructDef | EnumDef)*
+  kw<"END_TYPE">
+}
+
+StructDef {
+  Identifier ":" kw<"STRUCT">
+  StructField*
+  kw<"END_STRUCT"> ";"?
+}
+
+StructField {
+  Identifier ":" TypeSpec (":" "=" Expression)? ";"
+}
+
+EnumDef {
+  Identifier ":" "(" EnumValueList ")" ";"?
+}
+
+EnumValueList {
+  EnumValue ("," EnumValue)*
+}
+
+EnumValue {
+  Identifier (":=" Number)?
+}
+
+// ============================================================================
+// Variable Declarations
+// ============================================================================
+
+VarBlock {
+  VarKeyword VarQualifier?
+  VariableDecl*
+  kw<"END_VAR">
+}
+
+VarKeyword {
+  kw<"VAR"> |
+  kw<"VAR_INPUT"> |
+  kw<"VAR_OUTPUT"> |
+  kw<"VAR_IN_OUT"> |
+  kw<"VAR_TEMP"> |
+  kw<"VAR_GLOBAL"> |
+  kw<"VAR_EXTERNAL">
+}
+
+VarQualifier {
+  kw<"CONSTANT"> |
+  kw<"RETAIN">
+}
+
+VariableDecl {
+  VariableList AtAddress? ":" TypeSpec (":" "=" Expression)? ";"
+}
+
+AtAddress {
+  kw<"AT"> DirectAddress
+}
+
+VariableList {
+  Identifier ("," Identifier)*
+}
+
+TypeSpec {
+  TypeName |
+  ArrayType
+}
+
+TypeName {
+  kw<"BOOL"> |
+  kw<"INT"> |
+  kw<"SINT"> |
+  kw<"DINT"> |
+  kw<"LINT"> |
+  kw<"UINT"> |
+  kw<"USINT"> |
+  kw<"UDINT"> |
+  kw<"ULINT"> |
+  kw<"REAL"> |
+  kw<"LREAL"> |
+  kw<"TIME"> |
+  kw<"DATE"> |
+  kw<"TIME_OF_DAY"> |
+  kw<"DATE_AND_TIME"> |
+  kw<"STRING"> |
+  kw<"BYTE"> |
+  kw<"WORD"> |
+  kw<"DWORD"> |
+  kw<"LWORD"> |
+  kw<"TON"> |
+  kw<"TOF"> |
+  kw<"TP"> |
+  kw<"CTU"> |
+  kw<"CTD"> |
+  kw<"CTUD"> |
+  Identifier
+}
+
+ArrayType {
+  kw<"ARRAY"> "[" RangeList "]" kw<"OF"> TypeName
+}
+
+RangeList {
+  Range ("," Range)*
+}
+
+Range {
+  Number ".." Number
+}
+
+// ============================================================================
+// Assignment
+// ============================================================================
+
+Assignment {
+  Variable ":=" Expression ";"
+}
+
+// ============================================================================
+// Control Statements
+// ============================================================================
+
+IfStatement {
+  kw<"IF"> Expression kw<"THEN">
+  statement*
+  ElsifClause*
+  ElseClause?
+  kw<"END_IF"> ";"?
+}
+
+ElsifClause {
+  kw<"ELSIF"> Expression kw<"THEN">
+  statement*
+}
+
+ElseClause {
+  kw<"ELSE">
+  statement*
+}
+
+CaseStatement {
+  kw<"CASE"> Expression kw<"OF">
+  CaseClause+
+  ElseClause?
+  kw<"END_CASE"> ";"?
+}
+
+CaseClause {
+  CaseLabel ("," CaseLabel)* ":"
+  statement*
+}
+
+CaseLabel {
+  Number |
+  Number ".." Number
+}
+
+ForStatement {
+  kw<"FOR"> Identifier ":=" Expression kw<"TO"> Expression (kw<"BY"> Expression)?
+  kw<"DO">
+  statement*
+  kw<"END_FOR"> ";"?
+}
+
+WhileStatement {
+  kw<"WHILE"> Expression kw<"DO">
+  statement*
+  kw<"END_WHILE"> ";"?
+}
+
+RepeatStatement {
+  kw<"REPEAT">
+  statement*
+  kw<"UNTIL"> Expression
+  kw<"END_REPEAT"> ";"?
+}
+
+ReturnStatement {
+  kw<"RETURN"> ";"
+}
+
+ExitStatement {
+  kw<"EXIT"> ";"
+}
+
+ContinueStatement {
+  kw<"CONTINUE"> ";"
+}
+
+// ============================================================================
+// Function Block Calls
+// ============================================================================
+
+FunctionBlockCall {
+  Identifier "(" NamedArgumentList? ")" ";"?
+}
+
+NamedArgumentList {
+  NamedArgument ("," NamedArgument)*
+}
+
+NamedArgument {
+  Identifier ":=" Expression
+}
+
+// ============================================================================
+// Expressions
+// ============================================================================
+
+Expression {
+  OrExpression
+}
+
+OrExpression {
+  AndExpression (kw<"OR"> AndExpression)*
+}
+
+AndExpression {
+  XorExpression (kw<"AND"> XorExpression)*
+}
+
+XorExpression {
+  CompareExpression (kw<"XOR"> CompareExpression)*
+}
+
+CompareExpression {
+  AddExpression (CompareOp AddExpression)?
+}
+
+CompareOp {
+  "=" | "<>" | "<" | ">" | "<=" | ">="
+}
+
+AddExpression {
+  MulExpression (("+" | "-") MulExpression)*
+}
+
+MulExpression {
+  UnaryExpression (("*" | "/" | kw<"MOD">) UnaryExpression)*
+}
+
+UnaryExpression {
+  ("-" | kw<"NOT">)* PowerExpression
+}
+
+PowerExpression {
+  PrimaryExpression ("**" PrimaryExpression)*
+}
+
+PrimaryExpression {
+  Variable |
+  Literal |
+  FunctionCall |
+  "(" Expression ")"
+}
+
+Variable {
+  Identifier (("." Identifier) | ArrayIndex)*
+}
+
+ArrayIndex {
+  "[" IndexList "]"
+}
+
+IndexList {
+  Expression ("," Expression)*
+}
+
+FunctionCall {
+  Identifier "(" ArgumentList? ")"
+}
+
+ArgumentList {
+  Expression ("," Expression)*
+}
+
+// ============================================================================
+// Literals
+// ============================================================================
+
+Literal {
+  HexNumber |
+  BinaryNumber |
+  Number |
+  Boolean |
+  String |
+  DateAndTimeLiteral |
+  TimeOfDayLiteral |
+  DateLiteral |
+  TimeLiteral |
+  QualifiedEnumValue
+}
+
+// Qualified enum value: TypeName#Value (e.g., TrafficLight#Yellow)
+// Must be a grammar rule (not token) to disambiguate from hex/binary/time literals
+QualifiedEnumValue {
+  Identifier "#" Identifier
+}
+
+// ============================================================================
+// Tokens
+// ============================================================================
+
+@tokens {
+  Identifier { $[a-zA-Z_] $[a-zA-Z0-9_]* }
+
+  // Hexadecimal literal: 16#FF, 16#DEADBEEF
+  HexNumber { "16#" $[0-9a-fA-F]+ }
+
+  // Binary literal: 2#1010, 2#1111_0000
+  BinaryNumber { "2#" $[01_]+ }
+
+  Number { $[0-9]+ ("." $[0-9]+)? }
+
+  Boolean { "TRUE" | "FALSE" }
+
+  String { "'" (!['\\] | "\\" _)* "'" | '"' (!["\\] | "\\" _)* '"' }
+
+  // Time literal: T#5s, T#1h30m, TIME#100ms
+  TimeLiteral {
+    ("T#" | "TIME#") $[0-9a-zA-Z]+
+  }
+
+  // Date literal: D#2024-01-15, DATE#2024-06-30
+  DateLiteral {
+    ("D#" | "DATE#") $[0-9\-]+
+  }
+
+  // Time of day literal: TOD#14:30:00, TIME_OF_DAY#08:15:30.500
+  TimeOfDayLiteral {
+    ("TOD#" | "TIME_OF_DAY#") $[0-9:.]+
+  }
+
+  // Date and time literal: DT#2024-01-15-14:30:00, DATE_AND_TIME#2024-06-30-08:15:30
+  DateAndTimeLiteral {
+    ("DT#" | "DATE_AND_TIME#") $[0-9:\-\.]+
+  }
+
+  // Direct address (AT addressing): %IX0.0, %QX1.2.3, %MW0, %MD1, etc.
+  // Format: % + Location(I/Q/M) + Size(X/B/W/D/L)? + Address(0 or 0.1 or 0.1.2)
+  DirectAddress { "%" $[IQM] $[XBWDL]? $[0-9]+ ("." $[0-9]+)* }
+
+  LineComment { "//" ![\n]* }
+
+  BlockComment { "(*" blockCommentContent* "*)" }
+
+  blockCommentContent { ![*] | "*" ![)] }
+
+  space { $[ \t\n\r]+ }
+
+  "(" ")" "[" "]" "{" "}" ";" ":" ":=" "," ".." "."
+  "+" "-" "*" "/" "**" "=" "<>" "<" ">" "<=" ">="
+
+  @precedence { DateAndTimeLiteral, TimeOfDayLiteral, DateLiteral, TimeLiteral, HexNumber, BinaryNumber, Boolean, DirectAddress, Number, Identifier, LineComment, "/" }
+}
+
+// ============================================================================
+// Keywords
+// ============================================================================
+
+kw<term> { @specialize[@name={term}]<Identifier, term> }

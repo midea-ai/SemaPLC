@@ -1,0 +1,12 @@
+# io_map.yaml — 引脚语义提示层(可选,可手写)
+#
+# 给 located 引脚标注 component,过程仿真生成时据此偏置部件选择。
+# 最终的 IO→部件绑定仍以 config/scene.json 为准;本文件只是提示 + 可复用的 IO 契约。
+#
+# 键 = ST 里 `AT %…` 声明的符号名。component 取值:
+#   lamp / sensor-button / valve / cylinder / motor / conveyor / tank / numeric-display
+#
+# 示例(取消注释并按你的程序改):
+# red_led:      { component: lamp }
+# conveyor_run: { component: conveyor }
+# level:        { component: tank, label: 水位 }
