@@ -45,3 +45,6 @@ related-benchmarks/
 
 # 本地分析产物，不纳入版本库
 session-analysis/
+
+# 临时调试抓包产物(GLM 请求/响应复现等),不入库
+tmp/

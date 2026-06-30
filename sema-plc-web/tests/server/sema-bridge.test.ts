@@ -9,8 +9,12 @@ const TMP_WS = path.join(os.tmpdir(), `plc-vis-bridge-test-${Date.now()}-${rando
 beforeEach(() => {
   fs.rmSync(TMP_WS, { recursive: true, force: true })
 })
-afterEach(() => {
+afterEach(async () => {
   fs.rmSync(TMP_WS, { recursive: true, force: true })
+  delete process.env.GEMINI_API_KEY
+  const { setRuntimeCustomConfig, setRuntimeModelKey } = await import('../../server/model-registry.js')
+  setRuntimeModelKey(null)
+  setRuntimeCustomConfig(null)
 })
 
 // Mock sema-core (2.0.5: session-level API lives on the SemaSession returned by
@@ -308,6 +312,35 @@ describe('SemaBridge', () => {
     bus.removeAllListeners()
     await bridge.dispose()
     fs.rmSync(TMP_WS2, { recursive: true, force: true })
+  })
+
+  it('switches models without clearing the workspace or broadcasting workspace:switching', async () => {
+    fs.mkdirSync(TMP_WS, { recursive: true })
+    fs.writeFileSync(path.join(TMP_WS, 'keep.st'), 'PROGRAM keep END_PROGRAM')
+
+    const { SemaBridge } = await import('../../server/sema-bridge.js')
+    const { bus } = await import('../../server/event-bus.js')
+
+    const bridge = new SemaBridge(TMP_WS)
+    await bridge.start()
+
+    process.env.GEMINI_API_KEY = 'gemini-test'
+    const events: any[] = []
+    bus.on((m) => events.push(m))
+
+    bus.emit({ type: 'internal:model-switch', key: 'gemini' })
+    await new Promise(r => setTimeout(r, 30))
+
+    expect(fs.existsSync(path.join(TMP_WS, 'keep.st'))).toBe(true)
+    expect(fs.readFileSync(path.join(TMP_WS, 'keep.st'), 'utf8')).toBe('PROGRAM keep END_PROGRAM')
+    expect(events.some(e => e.type === 'workspace:switching')).toBe(false)
+
+    const config = events.filter(e => e.type === 'model:config').pop()
+    expect(config?.config.selected).toBe('gemini')
+    expect(config?.config.active?.key).toBe('gemini')
+
+    bus.removeAllListeners()
+    await bridge.dispose()
   })
 
   it('per-turn plan: forwards only the current turn\'s todos (id > backend watermark frozen at idle→processing edge)', async () => {

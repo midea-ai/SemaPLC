@@ -36,6 +36,69 @@
 .tb-btn.run.is-on{background:rgba(255,255,255,.07);color:#9fb8ad;}
 .tb-btn.stop:disabled,.tb-btn.run:disabled{opacity:.45;cursor:default;}
 .tb-btn.icon{padding:0;width:32px;justify-content:center;color:#9aa1b3;}
+.tb-btn.icon.model{position:relative;}
+.model-menu{position:relative;}
+.model-popover{position:absolute;right:0;top:39px;width:384px;background:#fff;border:1px solid var(--line);
+  border-radius:10px;box-shadow:0 16px 42px rgba(10,15,30,.22);z-index:50;overflow:hidden;}
+.model-pop-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:13px 14px;
+  border-bottom:1px solid var(--line);background:#FCFCFD;}
+.model-pop-title{font-size:13px;font-weight:700;color:var(--text-1);}
+.model-pop-sub{font-size:11.5px;color:var(--text-2);font-family:var(--mono);margin-top:2px;word-break:break-all;}
+.model-pop-close{width:24px;height:24px;border:none;border-radius:6px;background:transparent;color:var(--text-3);
+  font-size:18px;line-height:20px;display:flex;align-items:center;justify-content:center;}
+.model-pop-close:hover{background:#F1F2F5;color:var(--text-1);}
+.model-list{padding:6px;display:flex;flex-direction:column;gap:4px;}
+.model-empty{padding:14px;color:var(--text-3);font-size:12.5px;text-align:center;}
+.model-cols{display:flex;gap:4px;height:228px;}
+.model-vendors{flex:0 0 116px;display:flex;flex-direction:column;gap:2px;overflow:auto;
+  padding:4px;border-right:1px solid var(--line);}
+.model-vendor{display:flex;align-items:center;gap:6px;width:100%;border:none;background:transparent;
+  border-radius:7px;padding:8px 9px;text-align:left;cursor:pointer;position:relative;}
+.model-vendor:hover{background:#F2F3F6;}
+.model-vendor.active{background:var(--brand-soft);}
+.model-vendor.dim{opacity:.6;}
+.model-vendor-name{font-size:12.5px;font-weight:700;color:var(--text-1);}
+.model-vendor-count{margin-left:auto;font-size:10.5px;font-weight:700;color:var(--text-3);
+  background:#F2F3F6;border-radius:999px;padding:1px 7px;}
+.model-vendor.active .model-vendor-count{background:rgba(255,255,255,.7);color:var(--brand);}
+.model-vendor-dot{position:absolute;left:3px;top:50%;transform:translateY(-50%);width:3px;height:14px;
+  border-radius:2px;background:var(--brand);}
+.model-models{flex:1;display:flex;flex-direction:column;gap:2px;overflow:auto;padding:4px;}
+.model-row{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;border:none;
+  background:transparent;border-radius:8px;padding:9px 10px;text-align:left;}
+.model-row:hover:not(:disabled){background:#F2F3F6;}
+.model-row.active{background:var(--brand-soft);}
+.model-row:disabled{cursor:default;}
+.model-row-main{display:flex;flex-direction:column;gap:2px;min-width:0;}
+.model-row-title{font-size:13px;font-weight:700;color:var(--text-1);}
+.model-row-sub{font-size:11.5px;color:var(--text-2);font-family:var(--mono);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.model-row-badge{flex:0 0 auto;border-radius:999px;padding:2px 8px;font-size:11px;font-weight:700;}
+.model-row-badge.ok{background:var(--brand-soft);color:var(--brand);}
+.model-row-badge.active{background:var(--brand);color:#fff;}
+.model-row-badge.missing{background:#F2F3F6;color:var(--text-3);}
+.model-row.disabled{opacity:.55;}
+.model-row.disabled .model-row-title{color:var(--text-2);}
+.model-pop-note{border-top:1px solid var(--line);padding:10px 14px;font-size:11.5px;line-height:1.5;color:var(--text-2);background:#FCFCFD;}
+
+/* 自定义通道表单 */
+.model-vendor.custom{margin-top:auto;border-top:1px solid var(--line);border-radius:0;padding-top:8px;}
+.model-custom-form{display:flex;flex-direction:column;gap:11px;padding:6px 4px;}
+.model-field{display:flex;flex-direction:column;gap:5px;}
+.model-field-label{font-size:11px;font-weight:700;color:var(--text-2);letter-spacing:.02em;text-transform:uppercase;}
+.model-input{border:1px solid var(--line);border-radius:7px;padding:7px 9px;font-size:12.5px;color:var(--text-1);
+  font-family:var(--mono);background:var(--panel);outline:none;width:100%;box-sizing:border-box;}
+.model-input:focus{border-color:var(--brand);}
+.model-input::placeholder{color:var(--text-3);font-family:var(--mono);}
+.model-adapt-toggle{display:flex;gap:4px;}
+.model-adapt-toggle button{flex:1;border:1px solid var(--line);background:var(--panel);border-radius:7px;padding:6px 8px;
+  font-size:12px;font-weight:700;color:var(--text-2);cursor:pointer;}
+.model-adapt-toggle button.active{background:var(--brand-soft);border-color:var(--brand);color:var(--brand);}
+.model-submit-btn{border:none;background:var(--brand);color:#fff;border-radius:8px;padding:9px;font-size:13px;
+  font-weight:700;cursor:pointer;margin-top:2px;}
+.model-submit-btn:disabled{background:#E6E8EC;color:var(--text-3);cursor:not-allowed;}
+.model-submit-btn:not(:disabled):hover{filter:brightness(.96);}
+.model-custom-status{font-size:11.5px;color:var(--brand);font-weight:600;}
+.model-custom-hint{font-size:10.5px;color:var(--text-3);line-height:1.4;}
 
 /* 状态胶囊 */
 .status-pill{display:flex;align-items:center;gap:11px;background:rgba(255,255,255,.06);

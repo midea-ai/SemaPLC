@@ -5,6 +5,7 @@ import { subscribeEditorToWs } from './editor'
 import { subscribeWorkspaceToWs } from './workspace'
 import { subscribeLogsToWs } from './logs'
 import { subscribeSimToWs } from './sim'
+import { subscribeModelToWs } from './model'
 
 let wired = false
 
@@ -17,5 +18,6 @@ export function wireStoresToWs(): void {
   subscribeWorkspaceToWs(client)
   subscribeLogsToWs(client)
   subscribeSimToWs(client)
+  subscribeModelToWs(client)
   wired = true
 }

@@ -49,6 +49,22 @@ export type AgentBlock =
       result?: ToolBlockResult; status: 'running' | 'success' | 'error' }
 export interface SerializedTurn { turnId: string; blocks: AgentBlock[] }
 
+export interface ModelOption {
+  key: string
+  label: string
+  provider: string
+  modelName: string
+  configured: boolean
+  status: 'verified'
+  notes?: string
+}
+
+export interface ModelConfigState {
+  selected: string | null
+  active: { key: string; id: string; provider: string; modelName: string } | null
+  options: ModelOption[]
+}
+
 // ── Scene Spec (process simulation) — mirrors plc-tools src/tools/sceneSpec.ts ──
 export type ValueMatch =
   | { eq: number | boolean }
@@ -106,6 +122,10 @@ export type ClientMessage =
   | { type: 'plc:force'; set?: Record<string, number | boolean>; release?: string[] }
   | { type: 'permission:response'; requestId: string; decision: 'allow' | 'deny' | 'allow-always' }  // P2 reserved
   | { type: 'session:reset' }
+  | { type: 'model:switch'; key: string }
+  // UI 自定义通道:提交完整配置(baseURL/key/modelName/兼容格式)。
+  // 后端写入运行时 + .env,并切换到 'custom' 通道。adapt 选 OpenAI 兼容或 Anthropic 兼容。
+  | { type: 'model:custom-update'; baseURL: string; apiKey: string; modelName: string; adapt: 'openai' | 'anthropic' }
 
 // ─────────────────────────── Server → Client ───────────────────────────
 export type ServerMessage =
@@ -139,6 +159,7 @@ export type ServerMessage =
   | { type: 'plc:runtime-error'; errors: RuntimeError[] }
   | { type: 'plc:force-result'; forced: string[]; released: string[]; failed: Array<{ name: string; reason: string }>; error: string | null }
   | { type: 'scene:ready'; scene: SceneSpec; sceneErrors?: string[]; sceneWarnings?: string[] }
+  | { type: 'model:config'; config: ModelConfigState }
   // logs / error
   | { type: 'log'; source: LogSource; level: LogLevel; message: string; ts: number }
   | { type: 'error'; message: string }

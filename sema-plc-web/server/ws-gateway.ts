@@ -20,6 +20,7 @@ const STICKY_TYPES = new Set<ServerMessage['type']>([
   'agent:state',
   'agent:todos',
   'scene:ready',
+  'model:config',
 ])
 
 export class WsGateway {
@@ -93,6 +94,12 @@ export class WsGateway {
         break
       case 'session:reset':
         bus.emit({ type: 'internal:session-reset' })
+        break
+      case 'model:switch':
+        bus.emit({ type: 'internal:model-switch', key: m.key })
+        break
+      case 'model:custom-update':
+        bus.emit({ type: 'internal:custom-update', baseURL: m.baseURL, apiKey: m.apiKey, modelName: m.modelName, adapt: m.adapt })
         break
       case 'editor:save':
         bus.emit({ type: 'internal:editor-save', path: m.path, stCode: m.stCode })

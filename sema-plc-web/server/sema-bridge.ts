@@ -7,92 +7,9 @@ import { validateSceneSpec } from '../../sema-plc-tools/dist/tools/sceneSpec.js'
 import * as fs from 'fs'
 import * as path from 'path'
 import { safePath } from './pathSafety.js'
+import { currentModelConfigState, getRuntimeCustomConfig, resolveModel, setRuntimeModelKey, setRuntimeCustomConfig, writeCustomToEnv, VERIFIED_MODEL_KEYS } from './model-registry.js'
 
 const COMPILED_ST_REL = 'src/programs/_running.st'  // transient mirror for inline-stCode builds; self-cleaned once a real .st covers it
-
-// LLM model registry — mirrors W2/plc-agent-demo/run-demo.mjs. Pick with PLC_MODEL;
-// when unset, fall back by available key (DEEPSEEK > MINIMAX > ANTHROPIC > GEMINI) for backwards compat.
-// All MiniMax variants share one Anthropic-compatible endpoint + the same MINIMAX_API_KEY;
-// only modelName differs, so build them from one factory.
-const minimax = (modelName: string) => ({
-  modelName, provider: 'anthropic', baseURL: 'https://api.minimaxi.com/anthropic',
-  apiKey: process.env.MINIMAX_API_KEY, maxTokens: 32000, contextLength: 200000, adapt: 'anthropic',
-})
-// Gemini (Google AI Studio, OpenAI-compatible endpoint). key: GEMINI_API_KEY.
-// 全系列同一端点,只 modelName 不同 → 一个工厂(同 minimax);加新模型只需加一行。
-// provider 必须是 'openai'(不是 'custom'):openai adapter 对非-openai provider 会附加
-// 一个 `thinking:{type:...}` 字段(给 DeepSeek/Anthropic 用),而 Gemini 的 OpenAI 兼容
-// 端点会以 400 "Unknown name thinking" 拒绝它。'openai' 走 reasoning_effort 分支,Gemini 接受。
-const gemini = (modelName: string) => ({
-  modelName, provider: 'openai', baseURL: 'https://generativelanguage.googleapis.com/v1beta/openai',
-  apiKey: process.env.GEMINI_API_KEY, maxTokens: 32000, contextLength: 1000000, adapt: 'openai',
-})
-const MODELS: Record<string, { modelName: string; provider: string; baseURL: string; apiKey?: string; maxTokens: number; contextLength: number; adapt: string }> = {
-  deepseek: {
-    modelName: process.env.DEEPSEEK_MODEL ?? 'deepseek-chat',
-    provider: 'custom', baseURL: 'https://api.deepseek.com/v1',
-    apiKey: process.env.DEEPSEEK_API_KEY, maxTokens: 8192, contextLength: 64000, adapt: 'openai',
-  },
-  'deepseek-v4-pro': {
-    modelName: 'deepseek-v4-pro',
-    provider: 'custom', baseURL: 'https://aimpapi.midea.com/t-aigc/aimp-deepseek-v4-pro/v1',
-    apiKey: process.env.DEEPSEEK_V4_PRO_API_KEY, maxTokens: 8192, contextLength: 64000, adapt: 'openai',
-  },
-  anthropic: {
-    modelName: 'claude-opus-4-7',
-    provider: 'anthropic', baseURL: 'https://api.anthropic.com',
-    apiKey: process.env.ANTHROPIC_API_KEY, maxTokens: 32000, contextLength: 200000, adapt: 'anthropic',
-  },
-  // MiniMax (Anthropic-compatible endpoint). key: MINIMAX_API_KEY.
-  // `minimax` keeps pointing at M3 for backward compat; the others are explicit by PLC_MODEL.
-  minimax: minimax('MiniMax-M3'),
-  'minimax-m3': minimax('MiniMax-M3'),
-  'minimax-m2.7': minimax('MiniMax-M2.7'),
-  'minimax-m2.7-highspeed': minimax('MiniMax-M2.7-highspeed'),
-  'minimax-m2.5': minimax('MiniMax-M2.5'),
-  'minimax-m2.5-highspeed': minimax('MiniMax-M2.5-highspeed'),
-  // Gemini (OpenAI-compatible endpoint). key: GEMINI_API_KEY.
-  // `gemini` 默认指 2.5-flash —— 2.5 系列实测可跑通完整工具循环(generate→plc_check→write)。
-  // 3.x(3.5-flash/3.1-pro)条目保留,但当前 sema-core 的 openai adapter 不回传 Gemini-3 的
-  // thought_signature,多轮工具调用第二轮会被 400 拒(missing thought_signature);需先给 adapter
-  // 打 round-trip 补丁才可用。另:3.1-pro-preview 在免费层 key 上额度为 0,会 429。
-  gemini: gemini('gemini-2.5-flash'),
-  'gemini-2.5-flash': gemini('gemini-2.5-flash'),
-  'gemini-2.5-pro': gemini('gemini-2.5-pro'),
-  'gemini-3.5-flash': gemini('gemini-3.5-flash'),
-  'gemini-3.1': gemini('gemini-3.1-pro-preview'),
-  'gemini-3.1-pro': gemini('gemini-3.1-pro-preview'),
-}
-
-function resolveModel(): { cfg: (typeof MODELS)[string]; id: string } | null {
-  const selected = process.env.PLC_MODEL
-    ?? (process.env.DEEPSEEK_API_KEY ? 'deepseek'
-      : process.env.MINIMAX_API_KEY ? 'minimax'
-      : process.env.ANTHROPIC_API_KEY ? 'anthropic'
-      : process.env.GEMINI_API_KEY ? 'gemini'
-      : undefined)
-  if (!selected) return null  // no env-driven selection → rely on sema-core's persisted global model
-  const cfg = MODELS[selected]
-  if (!cfg) throw new Error(`unknown PLC_MODEL='${selected}', options: ${Object.keys(MODELS).join(' | ')}`)
-  // Missing key → degrade gracefully (don't crash the backend). The UI, PLC run/stop,
-  // ladder/vars/sim tabs all work without a model; only the left-side chat is disabled.
-  // Copy .env.example → .env and set the matching *_API_KEY, then restart to enable chat.
-  if (!cfg.apiKey) {
-    bus.emit({ type: 'log', ts: Date.now(), source: 'system', level: 'error',
-      message: `LLM key (${selected}) 未设置——已跳过模型注册,左侧对话不可用。复制 .env.example 为 .env 填入对应的 *_API_KEY 后重启即可启用;UI / 运行 / 各 tab 不受影响。` })
-    return null
-  }
-  // Guard against the docs placeholder / non-ASCII keys: an Authorization header
-  // must be a Latin1 ByteString, so a Chinese-laced key (e.g. "sk-你的key") makes
-  // every LLM call throw a cryptic ByteString error. Reject it once, clearly,
-  // and skip model registration so the UI/run/tabs still work (chat just disabled).
-  if (!/^[\x20-\x7E]+$/.test(cfg.apiKey)) {
-    bus.emit({ type: 'log', ts: Date.now(), source: 'system', level: 'error',
-      message: `LLM key (${selected}) 含非 ASCII 字符或仍是占位符——已跳过模型注册,左侧对话不可用。请用真实 *_API_KEY 重启;UI / 运行 / 各 tab 不受影响。` })
-    return null
-  }
-  return { cfg, id: `${cfg.modelName}[${cfg.provider}]` }
-}
 
 export class SemaBridge {
   private core: SemaCore | null = null
@@ -171,12 +88,11 @@ export class SemaBridge {
     // Register + select the LLM model before the session starts (mirrors run-demo).
     // skipValidation=true: high-latency endpoints can spuriously fail the short
     // startup connectivity probe; real request failures still surface at generation.
-    const model = resolveModel()
-    if (model) {
-      await (this.core as any).addModel(model.cfg, true)
-      await (this.core as any).applyTaskModel({ main: model.id, quick: model.id })
-      bus.emit({ type: 'log', ts: Date.now(), source: 'system', level: 'info', message: `model: ${model.id}` })
-    }
+    const model = resolveModel(process.env, (level, message) => {
+      bus.emit({ type: 'log', ts: Date.now(), source: 'system', level, message })
+    })
+    if (model) await this.applyModel(model)
+    this.emitModelConfig()
 
     // sema-core 2.0.5: createSession() resolves to { ok, session }; the session-level
     // API + events live on the returned SemaSession — wire events AFTER it exists.
@@ -298,8 +214,21 @@ export class SemaBridge {
     this.session.on('tool:execution:error', (d: { agentId: string; toolId: string; toolName: string; title?: string; content?: string; input?: unknown }) => {
       mp.onToolError(d as Parameters<typeof mp.onToolError>[0])
     })
-    this.session.on('session:error', (d: { message: string }) => {
-      bus.emit({ type: 'error', message: d.message })
+    this.session.on('session:error', (d: unknown) => {
+      const event = d as {
+        message?: string
+        error?: { code?: string; message?: string; details?: { status?: number; requestID?: string | null } }
+      }
+      const details = event.error?.details
+      const suffix = [
+        event.error?.code,
+        details?.status ? `status ${details.status}` : undefined,
+        details?.requestID ? `request ${details.requestID}` : undefined,
+      ].filter(Boolean).join(', ')
+      const message = event.message
+        ?? event.error?.message
+        ?? (typeof d === 'string' ? d : JSON.stringify(d))
+      bus.emit({ type: 'error', message: suffix ? `${message} (${suffix})` : message })
     })
     this.session.on('session:interrupted', () => {
       this.mapper?.onInterrupted()
@@ -389,9 +318,86 @@ export class SemaBridge {
       case 'internal:session-reset':
         await this.resetSession()
         break
+      case 'internal:model-switch': {
+        if (!(VERIFIED_MODEL_KEYS as readonly string[]).includes(m.key)) {
+          bus.emit({ type: 'error', message: `model '${m.key}' is not verified yet` })
+          break
+        }
+        const before = currentModelConfigState().selected
+        setRuntimeModelKey(m.key)
+        const model = resolveModel(process.env, (level, message) => {
+          bus.emit({ type: 'log', ts: Date.now(), source: 'system', level, message })
+        })
+        if (!model) {
+          setRuntimeModelKey(before)
+          this.emitModelConfig()
+          break
+        }
+        try {
+          await this.applyModel(model)
+          this.emitModelConfig()
+        } catch (e) {
+          setRuntimeModelKey(before)
+          this.emitModelConfig()
+          bus.emit({ type: 'error', message: `model switch failed: ${e instanceof Error ? e.message : String(e)}` })
+        }
+        break
+      }
+      case 'internal:custom-update': {
+        // UI 自定义通道:写入运行时配置 + 持久化到 .env,然后切换到 'custom' 通道。
+        const before = currentModelConfigState().selected
+        const prevCustom = getRuntimeCustomConfig()
+        const cfg = {
+          modelName: m.modelName,
+          provider: m.adapt === 'anthropic' ? 'anthropic' : 'openai',
+          baseURL: m.baseURL,
+          apiKey: m.apiKey,
+          maxTokens: 32000,
+          contextLength: 128000,
+          adapt: m.adapt,
+        }
+        setRuntimeCustomConfig(cfg)
+        try {
+          writeCustomToEnv(path.join(process.cwd(), '.env'), cfg)
+          bus.emit({ type: 'log', ts: Date.now(), source: 'system', level: 'info', message: `custom model saved to .env: ${m.modelName} @ ${m.baseURL}` })
+        } catch (e) {
+          bus.emit({ type: 'log', ts: Date.now(), source: 'system', level: 'error', message: `custom model: failed to write .env (${(e as Error).message}), runtime-only` })
+        }
+        setRuntimeModelKey('custom')
+        const model = resolveModel(process.env, (level, message) => {
+          bus.emit({ type: 'log', ts: Date.now(), source: 'system', level, message })
+        })
+        if (!model) {
+          setRuntimeModelKey(before)
+          setRuntimeCustomConfig(prevCustom)
+          this.emitModelConfig()
+          break
+        }
+        try {
+          await this.applyModel(model)
+          this.emitModelConfig()
+        } catch (e) {
+          setRuntimeModelKey(before)
+          setRuntimeCustomConfig(prevCustom)
+          this.emitModelConfig()
+          bus.emit({ type: 'error', message: `custom model switch failed: ${e instanceof Error ? e.message : String(e)}` })
+        }
+        break
+      }
       default:
         break
     }
+  }
+
+  private emitModelConfig(): void {
+    bus.emit({ type: 'model:config', config: currentModelConfigState() })
+  }
+
+  private async applyModel(model: NonNullable<ReturnType<typeof resolveModel>>): Promise<void> {
+    if (!this.core) throw new Error('SemaCore is not initialized')
+    await (this.core as any).addModel(model.cfg, true)
+    await (this.core as any).applyTaskModel({ main: model.id, quick: model.id })
+    bus.emit({ type: 'log', ts: Date.now(), source: 'system', level: 'info', message: `model: ${model.id}` })
   }
 
   private startFileWatcher(): void {

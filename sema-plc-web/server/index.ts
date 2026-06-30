@@ -1,3 +1,8 @@
+// 必须最先执行:抹掉 OpenAI SDK 的 UA/x-stainless 指纹,否则第三方中转站会 403。
+// 详见 relay-fetch-fix.ts。
+import { installRelayHeaderFix } from './relay-fetch-fix.js'
+installRelayHeaderFix()
+
 import { loadConfig } from './config.js'
 import { createHttpServer } from './http-server.js'
 import { WsGateway } from './ws-gateway.js'

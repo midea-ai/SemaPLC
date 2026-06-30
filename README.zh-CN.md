@@ -82,7 +82,7 @@ node dist/cli.js serve                                 # 改以 MCP stdio 服务
 
 - **Node.js ≥ 18** 和 **npm**
 - **Docker**(macOS / Windows 上用 Docker Desktop)—— 用于 OpenPLC Runtime 容器
-- 一个 **LLM API key**(推荐 DeepSeek;MiniMax / Anthropic / Gemini 同样支持)
+- 一个 **LLM API key**(推荐 DeepSeek;也支持 MiniMax / Anthropic / Gemini / OpenAI / xAI / Groq / OpenRouter / Qwen / Kimi 等 OpenAI-compatible 提供商)
 
 ### 安装
 
@@ -114,6 +114,7 @@ cp .env.example .env
 # 在 sema-plc-web/ 目录下
 ./dev.sh                       # 默认:deepseek
 PLC_MODEL=minimax-m2.7 ./dev.sh
+PLC_MODEL=openai ./dev.sh
 ```
 
 起来后你会看到:
@@ -125,7 +126,7 @@ PLC_MODEL=minimax-m2.7 ./dev.sh
 [VITE]   ➜  Local:   http://localhost:5173/
 ```
 
-打开 **<http://localhost:5173>**,在聊天面板里描述一个控制需求即可。手动分步启动、模型选项与详细配置见 **[sema-plc-web/README.md](sema-plc-web/README.md)**。
+打开 **<http://localhost:5173>**,在聊天面板里描述一个控制需求即可。手动分步启动、模型选项、支持的提供商与详细配置见 **[sema-plc-web/README.md](sema-plc-web/README.md)**。
 
 > 首次运行会构建 OpenPLC Docker 镜像(含从源码构建的 `rusty` 检查器),可能耗时几分钟。容器在 `https://localhost:8443` 暴露 REST API(自签名证书)。镜像自包含,无需任何私有镜像。
 
