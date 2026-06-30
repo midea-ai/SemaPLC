@@ -1,4 +1,5 @@
 import { memo, useEffect, useRef, useState } from 'react'
+import type { KeyboardEvent as ReactKeyboardEvent } from 'react'
 import { useAgentStore, type ChatMessage } from '../../store/agent'
 import { useWsConnection } from '../../ws/useWsConnection'
 import { useT, useLang } from '../../i18n'
@@ -77,6 +78,10 @@ function Bubble({ m, onRetry, retryDisabled }: { m: ChatMessage; onRetry: () => 
   )
 }
 
+export function shouldSubmitOnEnter(e: ReactKeyboardEvent<HTMLTextAreaElement>, isComposing: boolean): boolean {
+  return e.key === 'Enter' && !e.shiftKey && !isComposing && !e.nativeEvent.isComposing && e.keyCode !== 229
+}
+
 export function ChatPanel() {
   const t = useT()
   const lang = useLang()
@@ -88,6 +93,7 @@ export function ChatPanel() {
   const [shown, setShown] = useState<number[]>(() => pickThree())
   const scrollRef = useRef<HTMLDivElement>(null)
   const pinnedRef = useRef(true)
+  const composingRef = useRef(false)
   useEffect(() => {
     if (pinnedRef.current) scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight })
   }, [messages])  // zustand 每次更新都换 messages 引用 → 每个 delta 触发
@@ -171,7 +177,11 @@ export function ChatPanel() {
           placeholder={status === 'open' ? (agentState === 'processing' ? t('chat.input.placeholder.processing') : t('chat.input.placeholder.ready')) : status === 'connecting' ? t('chat.input.placeholder.connecting') : t('chat.input.placeholder.offline')}
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); if (!sendDisabled) submit() } }}
+          onCompositionStart={() => { composingRef.current = true }}
+          onCompositionEnd={() => {
+            setTimeout(() => { composingRef.current = false }, 0)
+          }}
+          onKeyDown={(e) => { if (shouldSubmitOnEnter(e, composingRef.current)) { e.preventDefault(); if (!sendDisabled) submit() } }}
           disabled={inputDisabled}
         />
         <button className="send-btn" onClick={() => submit()} disabled={sendDisabled} title={t('chat.send')}>
