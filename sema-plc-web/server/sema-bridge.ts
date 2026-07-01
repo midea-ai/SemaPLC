@@ -7,7 +7,9 @@ import { validateSceneSpec } from '../../sema-plc-tools/dist/tools/sceneSpec.js'
 import * as fs from 'fs'
 import * as path from 'path'
 import { safePath } from './pathSafety.js'
-import { currentModelConfigState, getRuntimeCustomConfig, resolveModel, setRuntimeModelKey, setRuntimeCustomConfig, writeCustomToEnv, VERIFIED_MODEL_KEYS } from './model-registry.js'
+import { currentModelConfigState, resolveModel, setRuntimeModelKey, VERIFIED_MODEL_KEYS, envKeyForModel, buildModelRegistry } from './model-registry.js'
+import { addCustomModel, deleteCustomModel, getCustomModel } from './custom-models.js'
+import { saveKeyOverride } from './key-overrides.js'
 
 const COMPILED_ST_REL = 'src/programs/_running.st'  // transient mirror for inline-stCode builds; self-cleaned once a real .st covers it
 
@@ -319,7 +321,7 @@ export class SemaBridge {
         await this.resetSession()
         break
       case 'internal:model-switch': {
-        if (!(VERIFIED_MODEL_KEYS as readonly string[]).includes(m.key)) {
+        if (!(VERIFIED_MODEL_KEYS as readonly string[]).includes(m.key) && !getCustomModel(m.key)) {
           bus.emit({ type: 'error', message: `model '${m.key}' is not verified yet` })
           break
         }
@@ -343,33 +345,17 @@ export class SemaBridge {
         }
         break
       }
-      case 'internal:custom-update': {
-        // UI 自定义通道:写入运行时配置 + 持久化到 .env,然后切换到 'custom' 通道。
+      case 'internal:custom-add': {
+        // 追加一条自定义模型到列表(custom-models.json 持久化),并切换过去。
         const before = currentModelConfigState().selected
-        const prevCustom = getRuntimeCustomConfig()
-        const cfg = {
-          modelName: m.modelName,
-          provider: m.adapt === 'anthropic' ? 'anthropic' : 'openai',
-          baseURL: m.baseURL,
-          apiKey: m.apiKey,
-          maxTokens: 32000,
-          contextLength: 128000,
-          adapt: m.adapt,
-        }
-        setRuntimeCustomConfig(cfg)
-        try {
-          writeCustomToEnv(path.join(process.cwd(), '.env'), cfg)
-          bus.emit({ type: 'log', ts: Date.now(), source: 'system', level: 'info', message: `custom model saved to .env: ${m.modelName} @ ${m.baseURL}` })
-        } catch (e) {
-          bus.emit({ type: 'log', ts: Date.now(), source: 'system', level: 'error', message: `custom model: failed to write .env (${(e as Error).message}), runtime-only` })
-        }
-        setRuntimeModelKey('custom')
+        const entry = addCustomModel({ baseURL: m.baseURL, apiKey: m.apiKey, modelName: m.modelName, adapt: m.adapt })
+        bus.emit({ type: 'log', ts: Date.now(), source: 'system', level: 'info', message: `custom model added: ${entry.modelName} @ ${entry.baseURL}` })
+        setRuntimeModelKey(entry.id)
         const model = resolveModel(process.env, (level, message) => {
           bus.emit({ type: 'log', ts: Date.now(), source: 'system', level, message })
         })
         if (!model) {
           setRuntimeModelKey(before)
-          setRuntimeCustomConfig(prevCustom)
           this.emitModelConfig()
           break
         }
@@ -378,10 +364,87 @@ export class SemaBridge {
           this.emitModelConfig()
         } catch (e) {
           setRuntimeModelKey(before)
-          setRuntimeCustomConfig(prevCustom)
           this.emitModelConfig()
           bus.emit({ type: 'error', message: `custom model switch failed: ${e instanceof Error ? e.message : String(e)}` })
         }
+        break
+      }
+      case 'internal:custom-delete': {
+        // 从列表删除;若删的是当前项,回退到第一个已配置的已验证模型。
+        const wasSelected = currentModelConfigState().selected === m.id
+        deleteCustomModel(m.id)
+        bus.emit({ type: 'log', ts: Date.now(), source: 'system', level: 'info', message: `custom model deleted: ${m.id}` })
+        if (wasSelected) {
+          const fallback = currentModelConfigState().options.find((o) => o.configured && !o.key.startsWith('custom'))?.key ?? null
+          setRuntimeModelKey(fallback)
+          const model = resolveModel(process.env, (level, message) => {
+            bus.emit({ type: 'log', ts: Date.now(), source: 'system', level, message })
+          })
+          if (model) {
+            try { await this.applyModel(model) } catch (e) {
+              bus.emit({ type: 'error', message: `fallback model failed: ${e instanceof Error ? e.message : String(e)}` })
+            }
+          }
+        }
+        this.emitModelConfig()
+        break
+      }
+      case 'internal:set-key': {
+        // 给未配置的内置模型填 API key:定位其 *_API_KEY 环境变量名,持久化 + 即时写
+        // process.env,然后重算并下发 model:config(徽标从「未配置」翻为已配置)。
+        // 不自动切换——用户随后点亮起来的行即可切过去。
+        const envKey = envKeyForModel(m.key)
+        if (!envKey) {
+          bus.emit({ type: 'error', message: `model '${m.key}' 没有可填 key 的环境变量槽` })
+          break
+        }
+        const val = m.apiKey.trim()
+        if (!val) {
+          bus.emit({ type: 'error', message: 'API key 不能为空' })
+          break
+        }
+        // 先探针校验链路:用刚填的 key + 该模型的 baseURL/modelName/adapt 发一个短请求
+        // (SemaCore testApiConnection 让模型回 "YES"),通了才落盘。探针独立于会话模型,
+        // 不影响当前 active。测不过就不保存,把原因 + curl 调试命令回给弹窗。
+        // 例外:force=true 时跳过探针直接保存——探针的 URL 规整(apiUtil.buildApiUrl)与
+        // 运行时(openai.js)并不完全一致,可能误报失败,故给用户「仍然保存」的越过口子。
+        const cfg = buildModelRegistry(process.env)[m.key]
+        if (!m.force && this.core && cfg) {
+          let result: { success: boolean; message: string; curlCommand?: string }
+          try {
+            result = await (this.core as any).testApiConnection({
+              provider: cfg.provider,
+              baseURL: cfg.baseURL,
+              modelName: cfg.modelName,
+              apiKey: val,
+              adapt: cfg.adapt,
+            })
+          } catch (e) {
+            result = { success: false, message: e instanceof Error ? e.message : String(e) }
+          }
+          if (!result.success) {
+            bus.emit({ type: 'model:key-result', key: m.key, ok: false, message: result.message, curl: result.curlCommand })
+            break
+          }
+        }
+        // 校验通过(或极端情况下 core 未就绪的兜底):落盘 + 若正是当前选中模型则激活。
+        saveKeyOverride(envKey, val)
+        bus.emit({ type: 'log', ts: Date.now(), source: 'system', level: 'info', message: `API key saved for ${m.key} (${envKey})` })
+        // 若刚填 key 的模型正是当前会被选中的那个(典型:启动 PLC_MODEL 指定但缺 key),
+        // 顺带 applyModel 让 SemaCore 真正加载它——否则 model:config 会算出 active 非 null,
+        // 前端显示「已激活」但对话实际不可用(SemaCore 没注册过任何模型)。
+        const model = resolveModel(process.env, (level, message) => {
+          bus.emit({ type: 'log', ts: Date.now(), source: 'system', level, message })
+        })
+        if (model && model.selected === m.key) {
+          try {
+            await this.applyModel(model)
+          } catch (e) {
+            bus.emit({ type: 'error', message: `模型激活失败: ${e instanceof Error ? e.message : String(e)}` })
+          }
+        }
+        this.emitModelConfig()
+        bus.emit({ type: 'model:key-result', key: m.key, ok: true })
         break
       }
       default:

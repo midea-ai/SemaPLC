@@ -1,4 +1,4 @@
-import * as fs from 'fs'
+import { listCustomModels, type CustomModelEntry } from './custom-models.js'
 
 export type ModelConfig = {
   modelName: string
@@ -13,11 +13,13 @@ export type ModelConfig = {
 export type VerifiedModelOption = {
   key: string
   label: string
+  labelEn: string
   provider: string
   modelName: string
   configured: boolean
   status: 'verified'
   notes?: string
+  envHint?: string
 }
 
 export type ModelConfigState = {
@@ -48,44 +50,22 @@ export function setRuntimeModelKey(key: string | null): void {
   runtimeModelKey = key
 }
 
-// 运行时自定义通道配置(UI 提交)。设置后,'custom' 通道用这份配置而非 .env 里的
-// PLC_OPENAI_COMPATIBLE_*。仅存内存,但 writeCustomToEnv 会同步写回 .env 持久化。
-let runtimeCustomConfig: ModelConfig | null = null
-
-export function getRuntimeCustomConfig(): ModelConfig | null {
-  return runtimeCustomConfig
+// 自定义模型 → ModelConfig。自定义列表由 custom-models.ts 持久化(见 buildModelRegistry)。
+function customEntryToConfig(e: CustomModelEntry): ModelConfig {
+  return {
+    modelName: e.modelName,
+    provider: e.adapt === 'anthropic' ? 'anthropic' : 'openai',
+    baseURL: e.baseURL,
+    apiKey: e.apiKey,
+    maxTokens: 32000,
+    contextLength: 128000,
+    adapt: e.adapt,
+  }
 }
 
-export function setRuntimeCustomConfig(cfg: ModelConfig | null): void {
-  runtimeCustomConfig = cfg
-}
-
-// 把自定义配置写回 .env(用 PLC_OPENAI_COMPATIBLE_* 变量名,重启后自动加载)。
-// 幂等:已存在的行替换,不存在的追加,保留文件其它内容。.env 已在 .gitignore。
-export function writeCustomToEnv(envPath: string, cfg: ModelConfig): void {
-  const lines = fs.existsSync(envPath) ? fs.readFileSync(envPath, 'utf8').split('\n') : []
-  const kv: Record<string, string> = {
-    PLC_MODEL: 'custom',
-    PLC_OPENAI_COMPATIBLE_BASE_URL: cfg.baseURL,
-    PLC_OPENAI_COMPATIBLE_MODEL: cfg.modelName,
-    PLC_OPENAI_COMPATIBLE_API_KEY: cfg.apiKey ?? '',
-    PLC_OPENAI_COMPATIBLE_PROVIDER: cfg.adapt === 'anthropic' ? 'anthropic' : 'openai',
-  }
-  const written = new Set<string>()
-  const out: string[] = []
-  for (const line of lines) {
-    const m = line.match(/^([A-Z_][A-Z0-9_]*)=/)
-    if (m && kv[m[1]] !== undefined) {
-      out.push(`${m[1]}=${kv[m[1]]}`)
-      written.add(m[1])
-    } else {
-      out.push(line)
-    }
-  }
-  for (const [k, v] of Object.entries(kv)) {
-    if (!written.has(k)) out.push(`${k}=${v}`)
-  }
-  fs.writeFileSync(envPath, out.join('\n'), 'utf8')
+// 从 baseURL 取主机名,用作列表行的副标题(同名模型靠 host 区分)。
+function hostOf(url: string): string {
+  try { return new URL(url).host } catch { return url }
 }
 
 function intEnv(env: NodeJS.ProcessEnv, name: string, fallback: number): number {
@@ -177,7 +157,7 @@ export function buildModelRegistry(env: NodeJS.ProcessEnv = process.env): Record
     contextLength: 131072,
   })
 
-  return {
+  const registry: Record<string, ModelConfig> = {
     deepseek: openAICompatible(env, 'DEEPSEEK', {
       modelName: env.DEEPSEEK_MODEL ?? 'deepseek-chat',
       provider: 'custom',
@@ -294,10 +274,10 @@ export function buildModelRegistry(env: NodeJS.ProcessEnv = process.env): Record
     'openai-compatible': customOpenAICompatible(env),
     'glm-4.7': customOpenAICompatible(env, 'glm-4.7'),
     'glm-5-turbo': customOpenAICompatible(env, 'glm-5-turbo'),
-    // 'custom' 是 UI 自定义通道的载体:运行时配置优先(由 setRuntimeCustomConfig 设置),
-    // 否则 fallback 到 .env 的 PLC_OPENAI_COMPATIBLE_*(重启后从写回的 .env 自动恢复)。
-    custom: runtimeCustomConfig ?? customOpenAICompatible(env),
   }
+  // UI 自定义模型列表(custom-models.json):每条按其 id 注册为一个可切换通道。
+  for (const e of listCustomModels(env)) registry[e.id] = customEntryToConfig(e)
+  return registry
 }
 
 export const FALLBACK_MODEL_ORDER = [
@@ -318,65 +298,132 @@ export const FALLBACK_MODEL_ORDER = [
 ]
 
 export const VERIFIED_MODEL_KEYS = [
+  'deepseek',
+  'anthropic',
+  'openai',
+  'xai',
   'minimax',
+  'minimax-m2.7',
   'doubao',
   'doubao-turbo',
   'doubao-code',
   'qwen',
   'qwen-plus',
   'qwen-flash',
-  'gemini',
-  'groq',
-  'groq-gpt-oss-20b',
-  'groq-llama-3.3-70b',
-  'groq-qwen3-32b',
-  'groq-qwen3.6-27b',
+  'gemini-3.5-flash',
+  'gemini-3.1-pro',
+  'openrouter',
+  'kimi',
+  'zai',
   'bigmodel',
-  'openai-compatible',
-  'glm-4.7',
-  'glm-5-turbo',
-  'custom',
+  'siliconflow',
 ] as const
 
 const VERIFIED_LABELS: Record<string, string> = {
-  minimax: 'MiniMax (Anthropic 兼容)',
+  deepseek: 'DeepSeek',
+  anthropic: 'Anthropic Claude',
+  openai: 'OpenAI',
+  xai: 'xAI Grok',
+  minimax: 'MiniMax M3',
+  'minimax-m2.7': 'MiniMax M2.7',
   doubao: '豆包 2.1 Pro',
   'doubao-turbo': '豆包 2.1 Turbo',
   'doubao-code': '豆包 2.0 Code',
   qwen: '通义千问 3.7 Max',
   'qwen-plus': '通义千问 3.7 Plus',
   'qwen-flash': '通义千问 3.5 Flash',
-  gemini: 'Google Gemini',
-  groq: 'Groq GPT OSS 120B',
-  'groq-gpt-oss-20b': 'Groq GPT OSS 20B',
-  'groq-llama-3.3-70b': 'Groq Llama 3.3 70B',
-  'groq-qwen3-32b': 'Groq Qwen3 32B',
-  'groq-qwen3.6-27b': 'Groq Qwen3.6 27B',
+  'gemini-3.5-flash': 'Google Gemini 3.5 Flash',
+  'gemini-3.1-pro': 'Google Gemini 3.1 Pro',
+  openrouter: 'OpenRouter',
+  kimi: 'Kimi K2.6',
+  zai: '智谱 GLM-5.2',
   bigmodel: 'BigModel GLM-5.2',
-  'openai-compatible': 'GLM 中转站 (GLM-5.2)',
-  'glm-4.7': 'GLM 中转站 (GLM-4.7)',
-  'glm-5-turbo': 'GLM 中转站 (GLM-5-Turbo)',
-  custom: '自定义模型',
+  siliconflow: 'SiliconFlow GLM-5.2',
+}
+
+// English labels for the model picker (UI language = en).
+const VERIFIED_LABELS_EN: Record<string, string> = {
+  deepseek: 'DeepSeek',
+  anthropic: 'Anthropic Claude',
+  openai: 'OpenAI',
+  xai: 'xAI Grok',
+  minimax: 'MiniMax M3',
+  'minimax-m2.7': 'MiniMax M2.7',
+  doubao: 'Doubao 2.1 Pro',
+  'doubao-turbo': 'Doubao 2.1 Turbo',
+  'doubao-code': 'Doubao 2.0 Code',
+  qwen: 'Qwen 3.7 Max',
+  'qwen-plus': 'Qwen 3.7 Plus',
+  'qwen-flash': 'Qwen 3.5 Flash',
+  'gemini-3.5-flash': 'Google Gemini 3.5 Flash',
+  'gemini-3.1-pro': 'Google Gemini 3.1 Pro',
+  openrouter: 'OpenRouter',
+  kimi: 'Kimi K2.6',
+  zai: 'Zhipu GLM-5.2',
+  bigmodel: 'BigModel GLM-5.2',
+  siliconflow: 'SiliconFlow GLM-5.2',
+}
+
+const ENV_HINTS: Record<string, string> = {
+  deepseek: 'DEEPSEEK_API_KEY',
+  anthropic: 'ANTHROPIC_API_KEY',
+  openai: 'OPENAI_API_KEY',
+  xai: 'XAI_API_KEY',
+  minimax: 'MINIMAX_API_KEY',
+  'minimax-m2.7': 'MINIMAX_API_KEY',
+  doubao: 'DOUBAO_API_KEY',
+  'doubao-turbo': 'DOUBAO_API_KEY',
+  'doubao-code': 'DOUBAO_API_KEY',
+  qwen: 'QWEN_API_KEY',
+  'qwen-plus': 'QWEN_API_KEY',
+  'qwen-flash': 'QWEN_API_KEY',
+  'gemini-3.5-flash': 'GEMINI_API_KEY',
+  'gemini-3.1-pro': 'GEMINI_API_KEY',
+  openrouter: 'OPENROUTER_API_KEY',
+  kimi: 'KIMI_API_KEY',
+  zai: 'ZAI_API_KEY',
+  bigmodel: 'BIGMODEL_API_KEY',
+  siliconflow: 'SILICONFLOW_API_KEY',
+}
+
+// 模型选项 key → 其对应的 *_API_KEY 环境变量名(未配置模型 UI 填 key 时用来定位环境变量)。
+export function envKeyForModel(key: string): string | undefined {
+  return ENV_HINTS[key]
 }
 
 export function verifiedModelOptions(env: NodeJS.ProcessEnv = process.env): VerifiedModelOption[] {
   const models = buildModelRegistry(env)
-  return VERIFIED_MODEL_KEYS.map((key) => {
+  const verified = VERIFIED_MODEL_KEYS.map((key) => {
     const cfg = models[key]
+    const configured = Boolean(cfg.apiKey)
     return {
       key,
       label: VERIFIED_LABELS[key] ?? key,
+      labelEn: VERIFIED_LABELS_EN[key] ?? VERIFIED_LABELS[key] ?? key,
       provider: cfg.provider,
       modelName: cfg.modelName,
-      configured: Boolean(cfg.apiKey),
+      configured,
       status: 'verified' as const,
-      notes: key === 'gemini'
+      notes: key === 'gemini-3.5-flash'
         ? 'Passed text stream, tool call, and tool-result roundtrip with gemini-2.5-flash.'
         : key.startsWith('groq')
         ? `Passed Groq tool-call probe with ${cfg.modelName}.`
         : undefined,
+      envHint: configured ? undefined : ENV_HINTS[key],
     }
   })
+  // 自定义模型列表:标题=模型名,副标题(借用 modelName 字段)=主机名,前端在「自定义」页渲染。
+  const custom = listCustomModels(env).map((e) => ({
+    key: e.id,
+    label: e.modelName,
+    labelEn: e.modelName,
+    provider: e.adapt === 'anthropic' ? 'anthropic' : 'openai',
+    modelName: hostOf(e.baseURL),
+    configured: true,
+    status: 'verified' as const,
+    notes: undefined,
+  }))
+  return [...verified, ...custom]
 }
 
 export function currentModelConfigState(env: NodeJS.ProcessEnv = process.env): ModelConfigState {
@@ -391,6 +438,8 @@ export function currentModelConfigState(env: NodeJS.ProcessEnv = process.env): M
 
 export function selectModelKey(env: NodeJS.ProcessEnv = process.env, models = buildModelRegistry(env)): string | undefined {
   if (runtimeModelKey) return runtimeModelKey
+  // 旧 .env 里 PLC_MODEL=custom(单槽时代)→ 映射到列表第一条,避免解析失败。
+  if (env.PLC_MODEL === 'custom') return listCustomModels(env)[0]?.id
   if (env.PLC_MODEL) return env.PLC_MODEL
   return FALLBACK_MODEL_ORDER.find((key) => Boolean(models[key]?.apiKey))
 }

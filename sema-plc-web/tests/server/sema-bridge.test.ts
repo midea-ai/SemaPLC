@@ -12,9 +12,8 @@ beforeEach(() => {
 afterEach(async () => {
   fs.rmSync(TMP_WS, { recursive: true, force: true })
   delete process.env.GEMINI_API_KEY
-  const { setRuntimeCustomConfig, setRuntimeModelKey } = await import('../../server/model-registry.js')
+  const { setRuntimeModelKey } = await import('../../server/model-registry.js')
   setRuntimeModelKey(null)
-  setRuntimeCustomConfig(null)
 })
 
 // Mock sema-core (2.0.5: session-level API lives on the SemaSession returned by
@@ -328,7 +327,7 @@ describe('SemaBridge', () => {
     const events: any[] = []
     bus.on((m) => events.push(m))
 
-    bus.emit({ type: 'internal:model-switch', key: 'gemini' })
+    bus.emit({ type: 'internal:model-switch', key: 'gemini-3.5-flash' })
     await new Promise(r => setTimeout(r, 30))
 
     expect(fs.existsSync(path.join(TMP_WS, 'keep.st'))).toBe(true)
@@ -336,8 +335,8 @@ describe('SemaBridge', () => {
     expect(events.some(e => e.type === 'workspace:switching')).toBe(false)
 
     const config = events.filter(e => e.type === 'model:config').pop()
-    expect(config?.config.selected).toBe('gemini')
-    expect(config?.config.active?.key).toBe('gemini')
+    expect(config?.config.selected).toBe('gemini-3.5-flash')
+    expect(config?.config.active?.key).toBe('gemini-3.5-flash')
 
     bus.removeAllListeners()
     await bridge.dispose()

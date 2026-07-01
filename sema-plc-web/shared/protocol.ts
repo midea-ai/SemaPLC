@@ -52,11 +52,14 @@ export interface SerializedTurn { turnId: string; blocks: AgentBlock[] }
 export interface ModelOption {
   key: string
   label: string
+  labelEn?: string
   provider: string
   modelName: string
   configured: boolean
   status: 'verified'
   notes?: string
+  /** env variable name the user needs to set, shown when configured=false */
+  envHint?: string
 }
 
 export interface ModelConfigState {
@@ -123,9 +126,14 @@ export type ClientMessage =
   | { type: 'permission:response'; requestId: string; decision: 'allow' | 'deny' | 'allow-always' }  // P2 reserved
   | { type: 'session:reset' }
   | { type: 'model:switch'; key: string }
-  // UI 自定义通道:提交完整配置(baseURL/key/modelName/兼容格式)。
-  // 后端写入运行时 + .env,并切换到 'custom' 通道。adapt 选 OpenAI 兼容或 Anthropic 兼容。
-  | { type: 'model:custom-update'; baseURL: string; apiKey: string; modelName: string; adapt: 'openai' | 'anthropic' }
+  // 自定义模型列表:add 追加一条并切换过去;delete 按 id 删除(删的是当前项则回退)。
+  // adapt 选 OpenAI 兼容或 Anthropic 兼容;持久化到 custom-models.json。
+  | { type: 'model:custom-add'; baseURL: string; apiKey: string; modelName: string; adapt: 'openai' | 'anthropic' }
+  | { type: 'model:custom-delete'; id: string }
+  // 给「未配置」的内置已验证模型填入 API key(持久化到 key-overrides.json,重启保留)。
+  // key 是模型选项 key(如 'deepseek'),后端据此定位对应的 *_API_KEY 环境变量名。
+  // 默认先探针校验链路、通过才保存;force=true 时跳过探针直接保存(校验误报时用户越过)。
+  | { type: 'model:set-key'; key: string; apiKey: string; force?: boolean }
 
 // ─────────────────────────── Server → Client ───────────────────────────
 export type ServerMessage =
@@ -160,6 +168,9 @@ export type ServerMessage =
   | { type: 'plc:force-result'; forced: string[]; released: string[]; failed: Array<{ name: string; reason: string }>; error: string | null }
   | { type: 'scene:ready'; scene: SceneSpec; sceneErrors?: string[]; sceneWarnings?: string[] }
   | { type: 'model:config'; config: ModelConfigState }
+  // 填 key 校验结果:ok=true 时前端关弹窗;失败带原因 message + 可复制的 curl 调试命令。
+  // 一次性事件(不进 sticky),前端只让 key 匹配当前弹窗的那个响应。
+  | { type: 'model:key-result'; key: string; ok: boolean; message?: string; curl?: string }
   // logs / error
   | { type: 'log'; source: LogSource; level: LogLevel; message: string; ts: number }
   | { type: 'error'; message: string }

@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { getWsClient } from '../../ws/client'
 import { useWorkspaceStore } from '../../store/workspace'
 import { usePlcStore } from '../../store/plc'
 import { useEditorStore } from '../../store/editor'
@@ -36,28 +37,49 @@ export function TopBar() {
   const [pathInput, setPathInput] = useState('')
   const [modelOpen, setModelOpen] = useState(false)
   const [vendorSel, setVendorSel] = useState<string | null>(null)
-  // 自定义通道表单 state(不进 store;key 提交后清空)
+  // 自定义模型表单 state(不进 store;提交后清空)
   const [customBaseURL, setCustomBaseURL] = useState('')
   const [customModelName, setCustomModelName] = useState('')
   const [customKey, setCustomKey] = useState('')
   const [customAdapt, setCustomAdapt] = useState<'openai' | 'anthropic'>('openai')
+  const [confirmDelId, setConfirmDelId] = useState<string | null>(null)  // 行内删除确认
+  // 未配置内置模型的填 key 弹窗:keyModalFor = 目标模型 key(null 关闭)
+  const [keyModalFor, setKeyModalFor] = useState<string | null>(null)
+  const [keyInput, setKeyInput] = useState('')
+  const [keyChecking, setKeyChecking] = useState(false)                                  // 校验请求进行中
+  const [keyError, setKeyError] = useState<{ message?: string; curl?: string } | null>(null)  // 校验失败原因
+  const [curlCopied, setCurlCopied] = useState(false)                                    // curl 复制反馈
 
-  // 厂商分类:纯前端按 key 前缀/label 派生(后端 provider 字段是适配器类型,不是厂商)
+  // 厂商分类:纯前端按 key 前缀派生(后端 provider 字段是适配器类型,不是厂商)
   const vendorOf = (key: string): string => {
     if (key.startsWith('doubao')) return 'doubao'
     if (key.startsWith('minimax')) return 'minimax'
     if (key.startsWith('qwen') || key === 'dashscope') return 'qwen'
     if (key.startsWith('gemini')) return 'gemini'
-    if (key.startsWith('groq')) return 'groq'
-    // GLM 系:bigmodel / openai-compatible / glm-* / zai / siliconflow
-    return 'glm'
+    if (key === 'deepseek' || key === 'deepseek-v4-pro') return 'deepseek'
+    if (key === 'anthropic') return 'anthropic'
+    if (key === 'openai') return 'openai'
+    if (key === 'xai') return 'xai'
+    if (key === 'openrouter') return 'openrouter'
+    if (key === 'kimi' || key === 'moonshot') return 'kimi'
+    if (key === 'zai' || key === 'zhipu') return 'zai'
+    if (key === 'bigmodel') return 'bigmodel'
+    if (key === 'siliconflow') return 'siliconflow'
+    return 'unknown'
   }
   const VENDOR_LABELS: Record<string, { zh: string; en: string }> = {
-    doubao: { zh: '豆包', en: 'Doubao' },
+    deepseek: { zh: 'DeepSeek', en: 'DeepSeek' },
+    anthropic: { zh: 'Anthropic', en: 'Anthropic' },
+    openai: { zh: 'OpenAI', en: 'OpenAI' },
+    xai: { zh: 'xAI', en: 'xAI' },
     minimax: { zh: 'MiniMax', en: 'MiniMax' },
+    doubao: { zh: '豆包', en: 'Doubao' },
     qwen: { zh: '通义千问', en: 'Qwen' },
-    glm: { zh: 'GLM 系', en: 'GLM' },
-    groq: { zh: 'Groq', en: 'Groq' },
+    bigmodel: { zh: 'BigModel', en: 'BigModel' },
+    zai: { zh: '智谱', en: 'Zhipu' },
+    siliconflow: { zh: 'SiliconFlow', en: 'SiliconFlow' },
+    openrouter: { zh: 'OpenRouter', en: 'OpenRouter' },
+    kimi: { zh: 'Kimi', en: 'Kimi' },
     gemini: { zh: 'Gemini', en: 'Gemini' },
   }
 
@@ -81,6 +103,393 @@ export function TopBar() {
     ? `${modelActive.key}:${modelActive.modelName}`
     : modelSelected ? `${modelSelected}: ${lang === 'zh' ? '未配置' : 'not configured'}`
     : (lang === 'zh' ? '未选择模型' : 'No model')
+  // 齿轮按钮上直接显示当前在用的 LLM 型号(取真实生效的 modelName;未配置/未选时给短占位)
+  const currentModelName = modelActive
+    ? modelActive.modelName
+    : modelSelected ? (lang === 'zh' ? '未配置' : 'no key')
+    : (lang === 'zh' ? '未选择' : 'none')
+
+  // 填 key 弹窗当前目标模型选项(用于展示名字/envHint)
+  const keyModalOpt = keyModalFor ? modelOptions.find((o) => o.key === keyModalFor) : null
+  const openKeyModal = (key: string) => {
+    setKeyModalFor(key); setKeyInput(''); setKeyError(null); setKeyChecking(false); setCurlCopied(false)
+  }
+  const closeKeyModal = () => {
+    setKeyModalFor(null); setKeyInput(''); setKeyError(null); setKeyChecking(false); setCurlCopied(false)
+  }
+  const submitKey = (force = false) => {
+    if (!keyModalFor || !keyInput.trim() || keyChecking) return
+    // 不立即关窗:等后端 model:key-result。校验通过才关,失败原地显示原因 + curl。
+    // force=true:探针误报时用户点「仍然保存」越过校验直接落盘。
+    send({ type: 'model:set-key', key: keyModalFor, apiKey: keyInput.trim(), force })
+    setKeyChecking(true); setKeyError(null); setCurlCopied(false)
+  }
+  // 监听填 key 校验结果——只认 key 匹配当前弹窗的那条(其它客户端/别的模型天然忽略)。
+  useEffect(() => {
+    const off = getWsClient().on((m) => {
+      if (m.type !== 'model:key-result' || m.key !== keyModalFor) return
+      setKeyChecking(false)
+      if (m.ok) { closeKeyModal() }
+      else { setKeyError({ message: m.message, curl: m.curl }); setCurlCopied(false) }
+    })
+    return off
+  }, [keyModalFor])
+
+  const modelMenu = (
+    <div className="model-menu">
+      <button
+        type="button"
+        className="tb-btn model-trigger"
+        aria-haspopup="dialog"
+        aria-expanded={modelOpen}
+        onClick={() => setModelOpen((v) => !v)}
+        title={lang === 'zh' ? `模型设置: ${currentModelText}` : `Model settings: ${currentModelText}`}
+      >
+        <svg width="15" height="15" viewBox="0 0 24 24" aria-hidden="true">
+          <path
+            d="M12 15.5A3.5 3.5 0 1 0 12 8a3.5 3.5 0 0 0 0 7.5Z"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+          />
+          <path
+            d="M19.4 15a1.8 1.8 0 0 0 .36 2l.05.05a2.1 2.1 0 0 1-2.97 2.97l-.05-.05a1.8 1.8 0 0 0-2-.36 1.8 1.8 0 0 0-1.09 1.65V21a2.1 2.1 0 0 1-4.2 0v-.07A1.8 1.8 0 0 0 8.4 19.3a1.8 1.8 0 0 0-2 .36l-.05.05a2.1 2.1 0 1 1-2.97-2.97l.05-.05a1.8 1.8 0 0 0 .36-2 1.8 1.8 0 0 0-1.65-1.09H2a2.1 2.1 0 0 1 0-4.2h.07A1.8 1.8 0 0 0 3.7 8.3a1.8 1.8 0 0 0-.36-2l-.05-.05a2.1 2.1 0 0 1 2.97-2.97l.05.05a1.8 1.8 0 0 0 2 .36H8.4A1.8 1.8 0 0 0 9.5 2.07V2a2.1 2.1 0 0 1 4.2 0v.07a1.8 1.8 0 0 0 1.09 1.65 1.8 1.8 0 0 0 2-.36l.05-.05a2.1 2.1 0 0 1 2.97 2.97l-.05.05a1.8 1.8 0 0 0-.36 2v.08A1.8 1.8 0 0 0 21.03 9.5H21a2.1 2.1 0 0 1 0 4.2h-.07A1.8 1.8 0 0 0 19.4 15Z"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+        <span className="model-trigger-name">{currentModelName}</span>
+      </button>
+      {modelOpen && (
+        <div className="model-popover" role="dialog" aria-label={lang === 'zh' ? '模型设置' : 'Model settings'}>
+          <div className="model-pop-head">
+            <div className="model-pop-headmain">
+              <div className="model-pop-eyebrow">{lang === 'zh' ? '模型设置 · 当前' : 'Model · Active'}</div>
+              <div className={'model-pop-current' + (modelActive ? '' : ' off')}>
+                <span className="model-pop-led" />
+                <span className="model-pop-current-name">{currentModelName}</span>
+                {modelActive && <span className="model-pop-current-key">{modelActive.key}</span>}
+              </div>
+            </div>
+            <button type="button" className="model-pop-close" onClick={() => setModelOpen(false)} aria-label="Close">×</button>
+          </div>
+          <div className="model-list">
+            {modelOptions.length === 0 && <div className="model-empty">{lang === 'zh' ? '暂无已验证模型' : 'No verified models yet'}</div>}
+            {(() => {
+              // 自定义模型(key 以 'custom' 开头)不进厂商分组,单独在「自定义」页管理。
+              const customModels = modelOptions.filter((o) => o.key.startsWith('custom'))
+              // 按厂商分组,保持 modelOptions 原始顺序内的首次出现顺序
+              const order: string[] = []
+              const groups: Record<string, typeof modelOptions> = {}
+              for (const o of modelOptions) {
+                if (o.key.startsWith('custom')) continue
+                const v = vendorOf(o.key)
+                if (!groups[v]) { groups[v] = []; order.push(v) }
+                groups[v].push(o)
+              }
+              // 当前选中模型所属"厂商"(自定义模型归到 'custom' 页)
+              const selVendor = modelSelected ? (modelSelected.startsWith('custom') ? 'custom' : vendorOf(modelSelected)) : null
+              // 'custom' = 已添加的自定义模型列表;'custom-add' = 添加表单。两者在左栏是独立入口。
+              const activeVendor = vendorSel && (vendorSel === 'custom' || vendorSel === 'custom-add' || groups[vendorSel])
+                ? vendorSel
+                : (selVendor ?? order.find((v) => groups[v].some((o) => o.configured)) ?? order[0])
+              const submitCustom = () => {
+                if (!customBaseURL.trim() || !customModelName.trim() || !customKey.trim()) return
+                send({
+                  type: 'model:custom-add',
+                  baseURL: customBaseURL.trim(),
+                  apiKey: customKey.trim(),
+                  modelName: customModelName.trim(),
+                  adapt: customAdapt,
+                })
+                // 加完清空表单、跳回自定义列表页(切换由后端完成,列表会刷新出新的当前项)
+                setCustomBaseURL(''); setCustomModelName(''); setCustomKey(''); setVendorSel('custom')
+              }
+              const vendorModels = groups[activeVendor] ?? []
+              const renderModelRow = (opt: typeof modelOptions[number]) => {
+                const active = opt.key === modelSelected
+                // 未配置:整行可点 → 打开填 key 弹窗(不是切换)。填完徽标翻为已配置,行才变可切换。
+                if (!opt.configured) {
+                  return (
+                    <button
+                      key={opt.key}
+                      type="button"
+                      className="model-row disabled needs-key"
+                      disabled={wsStatus !== 'open'}
+                      title={opt.envHint ? (lang === 'zh' ? `点击填入 ${opt.envHint}` : `Click to set ${opt.envHint}`) : undefined}
+                      onClick={() => openKeyModal(opt.key)}
+                    >
+                      <span className="model-row-main">
+                        <span className="model-row-title">{lang === 'en' ? (opt.labelEn ?? opt.label) : opt.label}</span>
+                        <span className="model-row-sub">{opt.modelName}</span>
+                      </span>
+                      <span className="model-row-badge missing">＋ {lang === 'zh' ? '填 key' : 'Add key'}{opt.envHint && <span className="model-row-env"> {opt.envHint}</span>}</span>
+                    </button>
+                  )
+                }
+                const disabled = wsStatus !== 'open' || active
+                return (
+                  <button
+                    key={opt.key}
+                    type="button"
+                    className={'model-row' + (active ? ' active' : '')}
+                    disabled={disabled}
+                    onClick={() => {
+                      // 切模型只影响后续 Agent 请求(后端仅 applyTaskModel,不重建会话),
+                      // 不动当前对话/代码/运行中的 PLC,故直接切,无需二次确认。
+                      send({ type: 'model:switch', key: opt.key })
+                      setModelOpen(false)
+                    }}
+                  >
+                    <span className="model-row-main">
+                      <span className="model-row-title">{lang === 'en' ? (opt.labelEn ?? opt.label) : opt.label}</span>
+                      <span className="model-row-sub">{opt.modelName}</span>
+                    </span>
+                    {active && (
+                      <span className="model-row-badge active"><span className="model-row-led" />{lang === 'zh' ? '当前' : 'Active'}</span>
+                    )}
+                  </button>
+                )
+              }
+              return (
+                <div className="model-cols">
+                  <div className="model-vendors">
+                    {order.map((v) => {
+                      const list = groups[v]
+                      const hasReady = list.some((o) => o.configured)
+                      const isActiveVendor = v === activeVendor
+                      const isCurrentVendor = selVendor === v
+                      return (
+                        <button
+                          key={v}
+                          type="button"
+                          className={'model-vendor' + (isActiveVendor ? ' active' : '') + (!hasReady ? ' dim' : '')}
+                          onClick={() => setVendorSel(v)}
+                        >
+                          <span className="model-vendor-name">{lang === 'zh' ? VENDOR_LABELS[v]?.zh : VENDOR_LABELS[v]?.en ?? v}</span>
+                          <span className="model-vendor-count">{list.length}</span>
+                          {isCurrentVendor && <span className="model-vendor-dot" />}
+                        </button>
+                      )
+                    })}
+                    <button
+                      type="button"
+                      className={'model-vendor custom' + (activeVendor === 'custom' ? ' active' : '')}
+                      onClick={() => setVendorSel('custom')}
+                    >
+                      <span className="model-vendor-name">{lang === 'zh' ? '⚙ 自定义' : '⚙ Custom'}</span>
+                      <span className="model-vendor-count">{customModels.length}</span>
+                      {selVendor === 'custom' && <span className="model-vendor-dot" />}
+                    </button>
+                    <button
+                      type="button"
+                      className={'model-vendor custom-add' + (activeVendor === 'custom-add' ? ' active' : '')}
+                      onClick={() => setVendorSel('custom-add')}
+                    >
+                      <span className="model-vendor-name">{lang === 'zh' ? '＋ 添加自定义' : '＋ Add custom'}</span>
+                    </button>
+                  </div>
+                  <div className="model-models">
+                    {activeVendor === 'custom' ? (
+                      <div className="model-custom">
+                        {/* 「自定义」页只列已添加的自定义模型;添加入口在左栏「＋ 添加自定义」,互不混放。 */}
+                        {customModels.length === 0 ? (
+                          <div className="model-custom-empty">
+                            {lang === 'zh' ? '暂无自定义模型,点左侧「＋ 添加自定义」新建。' : 'No custom models yet — use “＋ Add custom” on the left.'}
+                          </div>
+                        ) : customModels.map((opt) => {
+                          const active = opt.key === modelSelected
+                          const confirming = confirmDelId === opt.key
+                          return (
+                            <div key={opt.key} className={'model-crow' + (active ? ' active' : '')}>
+                              <button
+                                type="button"
+                                className="model-crow-hit"
+                                disabled={active || wsStatus !== 'open'}
+                                onClick={() => { send({ type: 'model:switch', key: opt.key }); setModelOpen(false) }}
+                              >
+                                <span className="model-row-main">
+                                  <span className="model-row-title">{opt.label}</span>
+                                  <span className="model-row-sub">{opt.modelName}</span>
+                                </span>
+                                {active && !confirming && <span className="model-row-badge active"><span className="model-row-led" />{lang === 'zh' ? '当前' : 'Active'}</span>}
+                              </button>
+                              {confirming ? (
+                                <span className="model-del-confirm">
+                                  <button type="button" className="model-del-yes" onClick={() => { send({ type: 'model:custom-delete', id: opt.key }); setConfirmDelId(null) }}>{lang === 'zh' ? '删除' : 'Delete'}</button>
+                                  <button type="button" className="model-del-no" onClick={() => setConfirmDelId(null)}>{lang === 'zh' ? '取消' : 'Cancel'}</button>
+                                </span>
+                              ) : (
+                                <button type="button" className="model-del-btn" title={lang === 'zh' ? '删除' : 'Delete'} aria-label="Delete" onClick={() => setConfirmDelId(opt.key)}>
+                                  <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
+                                    <path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2m2 0v12a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V7" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
+                                  </svg>
+                                </button>
+                              )}
+                            </div>
+                          )
+                        })}
+                      </div>
+                    ) : activeVendor === 'custom-add' ? (
+                      <div className="model-custom">
+                        <div className="model-custom-form">
+                          <div className="model-field">
+                            <label className="model-field-label">{lang === 'zh' ? '兼容格式' : 'Format'}</label>
+                            <div className="model-adapt-toggle">
+                              <button type="button" className={customAdapt === 'openai' ? 'active' : ''} onClick={() => setCustomAdapt('openai')}>OpenAI</button>
+                              <button type="button" className={customAdapt === 'anthropic' ? 'active' : ''} onClick={() => setCustomAdapt('anthropic')}>Anthropic</button>
+                            </div>
+                          </div>
+                          <div className="model-field">
+                            <label className="model-field-label">Base URL</label>
+                            <input
+                              className="model-input"
+                              value={customBaseURL}
+                              onChange={(e) => setCustomBaseURL(e.target.value)}
+                              placeholder={customAdapt === 'openai' ? 'https://provider/v1' : (lang === 'zh' ? 'https://provider (不带 /v1)' : 'https://provider (no /v1)')}
+                              autoFocus
+                            />
+                          </div>
+                          <div className="model-field">
+                            <label className="model-field-label">{lang === 'zh' ? '模型名' : 'Model name'}</label>
+                            <input
+                              className="model-input"
+                              value={customModelName}
+                              onChange={(e) => setCustomModelName(e.target.value)}
+                              placeholder="e.g. glm-5-turbo"
+                            />
+                          </div>
+                          <div className="model-field">
+                            <label className="model-field-label">{lang === 'zh' ? 'API Key' : 'API Key'}</label>
+                            <input
+                              className="model-input"
+                              type="password"
+                              value={customKey}
+                              onChange={(e) => setCustomKey(e.target.value)}
+                              placeholder="sk-…"
+                            />
+                          </div>
+                          <div className="model-custom-actions">
+                            <button
+                              type="button"
+                              className="model-submit-btn"
+                              disabled={wsStatus !== 'open' || !customBaseURL.trim() || !customModelName.trim() || !customKey.trim()}
+                              onClick={submitCustom}
+                            >
+                              {lang === 'zh' ? '添加并切换' : 'Add & switch'}
+                            </button>
+                            <button
+                              type="button"
+                              className="model-cancel-btn"
+                              onClick={() => { setVendorSel('custom'); setCustomBaseURL(''); setCustomModelName(''); setCustomKey('') }}
+                            >
+                              {lang === 'zh' ? '取消' : 'Cancel'}
+                            </button>
+                          </div>
+                          <div className="model-custom-hint">
+                            {lang === 'zh' ? '保存到自定义列表,重启后保留。' : 'Saved to your custom list; persists across restart.'}
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      vendorModels.map(renderModelRow)
+                    )}
+                  </div>
+                </div>
+              )
+            })()}
+          </div>
+          <div className="model-pop-note">
+            {lang === 'zh'
+              ? '已验证模型 key 由 .env 管理;也可在「自定义」里填任意 OpenAI/Anthropic 兼容端点。'
+              : 'Verified models use .env keys; or fill any OpenAI/Anthropic-compatible endpoint under Custom.'}
+          </div>
+        </div>
+      )}
+      {keyModalOpt && (
+        <div className="model-key-overlay" onClick={closeKeyModal}>
+          <div
+            className="model-key-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-label={lang === 'zh' ? '填入 API Key' : 'Set API Key'}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="model-key-head">
+              <span className="model-key-title">{lang === 'zh' ? '填入 API Key' : 'Set API Key'}</span>
+              <button type="button" className="model-pop-close" onClick={closeKeyModal} aria-label="Close">×</button>
+            </div>
+            <div className="model-key-sub">
+              {(lang === 'en' ? (keyModalOpt.labelEn ?? keyModalOpt.label) : keyModalOpt.label)} · {keyModalOpt.modelName}
+            </div>
+            <div className="model-field">
+              <label className="model-field-label">API Key{keyModalOpt.envHint ? ` · ${keyModalOpt.envHint}` : ''}</label>
+              <input
+                className="model-input"
+                type="password"
+                autoFocus
+                disabled={keyChecking}
+                value={keyInput}
+                onChange={(e) => setKeyInput(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') submitKey(); else if (e.key === 'Escape') closeKeyModal() }}
+                placeholder="sk-…"
+              />
+            </div>
+            {keyError && (
+              <div className="model-key-err">
+                <div className="model-key-err-msg">{keyError.message || (lang === 'zh' ? '链路校验失败' : 'Connection test failed')}</div>
+                {keyError.curl && (
+                  <div className="model-key-curl">
+                    <div className="model-key-curl-head">
+                      <span>{lang === 'zh' ? 'curl 调试命令' : 'curl to debug'}</span>
+                      <button
+                        type="button"
+                        className="model-key-curl-copy"
+                        onClick={() => { navigator.clipboard?.writeText(keyError.curl ?? ''); setCurlCopied(true) }}
+                      >
+                        {curlCopied ? (lang === 'zh' ? '已复制' : 'Copied') : (lang === 'zh' ? '复制' : 'Copy')}
+                      </button>
+                    </div>
+                    <pre className="model-key-curl-body">{keyError.curl}</pre>
+                  </div>
+                )}
+                {/* 探针的 URL 规整未必等于运行时,可能误报——给用户一个越过校验直接保存的口子。 */}
+                <button
+                  type="button"
+                  className="model-key-force"
+                  disabled={wsStatus !== 'open' || !keyInput.trim() || keyChecking}
+                  onClick={() => submitKey(true)}
+                >
+                  {lang === 'zh' ? '仍然保存(跳过校验)' : 'Save anyway (skip check)'}
+                </button>
+              </div>
+            )}
+            <div className="model-custom-actions">
+              <button
+                type="button"
+                className="model-submit-btn"
+                disabled={wsStatus !== 'open' || !keyInput.trim() || keyChecking}
+                onClick={() => submitKey(false)}
+              >
+                {keyChecking ? (lang === 'zh' ? '校验中…' : 'Checking…') : (lang === 'zh' ? '保存' : 'Save')}
+              </button>
+              <button type="button" className="model-cancel-btn" onClick={closeKeyModal}>
+                {lang === 'zh' ? '取消' : 'Cancel'}
+              </button>
+            </div>
+            <div className="model-custom-hint">
+              {lang === 'zh'
+                ? '保存前会发一个短请求校验链路;通过才写入 key-overrides.json(重启保留)。.env / shell 已设的同名 key 优先。'
+                : 'A short probe checks the endpoint before saving; only on success is the key written to key-overrides.json (persists across restart). Existing .env/shell keys take precedence.'}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
 
   return (
     <header className="topbar">
@@ -112,6 +521,7 @@ export function TopBar() {
       </div>
 
       <div className="tb-right">
+        {modelMenu}
         <div className="lang-toggle" role="group" aria-label="Language">
           <button type="button" className={lang === 'zh' ? 'active' : ''} aria-pressed={lang === 'zh'} onClick={() => setLang('zh')}>中</button>
           <button type="button" className={lang === 'en' ? 'active' : ''} aria-pressed={lang === 'en'} onClick={() => setLang('en')}>EN</button>
@@ -124,202 +534,6 @@ export function TopBar() {
           <StatusDot tone={comp[0]} label={comp[1]} pulse={comp[2]} />
         </div>
         <div className="tb-actions">
-          <div className="model-menu">
-            <button
-              type="button"
-              className="tb-btn icon model"
-              aria-haspopup="dialog"
-              aria-expanded={modelOpen}
-              onClick={() => setModelOpen((v) => !v)}
-              title={lang === 'zh' ? `模型设置: ${currentModelText}` : `Model settings: ${currentModelText}`}
-            >
-              <svg width="15" height="15" viewBox="0 0 24 24" aria-hidden="true">
-                <path
-                  d="M12 15.5A3.5 3.5 0 1 0 12 8a3.5 3.5 0 0 0 0 7.5Z"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                />
-                <path
-                  d="M19.4 15a1.8 1.8 0 0 0 .36 2l.05.05a2.1 2.1 0 0 1-2.97 2.97l-.05-.05a1.8 1.8 0 0 0-2-.36 1.8 1.8 0 0 0-1.09 1.65V21a2.1 2.1 0 0 1-4.2 0v-.07A1.8 1.8 0 0 0 8.4 19.3a1.8 1.8 0 0 0-2 .36l-.05.05a2.1 2.1 0 1 1-2.97-2.97l.05-.05a1.8 1.8 0 0 0 .36-2 1.8 1.8 0 0 0-1.65-1.09H2a2.1 2.1 0 0 1 0-4.2h.07A1.8 1.8 0 0 0 3.7 8.3a1.8 1.8 0 0 0-.36-2l-.05-.05a2.1 2.1 0 0 1 2.97-2.97l.05.05a1.8 1.8 0 0 0 2 .36H8.4A1.8 1.8 0 0 0 9.5 2.07V2a2.1 2.1 0 0 1 4.2 0v.07a1.8 1.8 0 0 0 1.09 1.65 1.8 1.8 0 0 0 2-.36l.05-.05a2.1 2.1 0 0 1 2.97 2.97l-.05.05a1.8 1.8 0 0 0-.36 2v.08A1.8 1.8 0 0 0 21.03 9.5H21a2.1 2.1 0 0 1 0 4.2h-.07A1.8 1.8 0 0 0 19.4 15Z"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-            </button>
-            {modelOpen && (
-              <div className="model-popover" role="dialog" aria-label={lang === 'zh' ? '模型设置' : 'Model settings'}>
-                <div className="model-pop-head">
-                  <div>
-                    <div className="model-pop-title">{lang === 'zh' ? '模型设置' : 'Model Settings'}</div>
-                    <div className="model-pop-sub">{currentModelText}</div>
-                  </div>
-                  <button type="button" className="model-pop-close" onClick={() => setModelOpen(false)} aria-label="Close">×</button>
-                </div>
-                <div className="model-list">
-                  {modelOptions.length === 0 && <div className="model-empty">{lang === 'zh' ? '暂无已验证模型' : 'No verified models yet'}</div>}
-                  {(() => {
-                    // 按厂商分组,保持 modelOptions 原始顺序内的首次出现顺序
-                    const order: string[] = []
-                    const groups: Record<string, typeof modelOptions> = {}
-                    for (const o of modelOptions) {
-                      const v = vendorOf(o.key)
-                      if (!groups[v]) { groups[v] = []; order.push(v) }
-                      groups[v].push(o)
-                    }
-                    // 默认选中当前模型所属厂商(或第一个有可用模型的厂商)
-                    const activeVendor = vendorSel && (vendorSel === 'custom' || groups[vendorSel])
-                      ? vendorSel
-                      : (modelSelected ? vendorOf(modelSelected) : order.find((v) => groups[v].some((o) => o.configured)) ?? order[0])
-                    const vendorModels = groups[activeVendor] ?? []
-                    // 自定义通道当前是否已配置(用于显示状态)
-                    const customOpt = modelOptions.find((o) => o.key === 'custom')
-                    const submitCustom = () => {
-                      if (!customBaseURL.trim() || !customModelName.trim() || !customKey.trim()) return
-                      if (!window.confirm(lang === 'zh' ? '保存并切换到自定义模型。后续 Agent 请求将使用该模型。继续吗？' : 'Save and switch to the custom model. Future Agent requests will use it. Continue?')) return
-                      send({
-                        type: 'model:custom-update',
-                        baseURL: customBaseURL.trim(),
-                        apiKey: customKey.trim(),
-                        modelName: customModelName.trim(),
-                        adapt: customAdapt,
-                      })
-                      setCustomKey('')
-                      setModelOpen(false)
-                    }
-                    const renderModelRow = (opt: typeof modelOptions[number]) => {
-                      const active = opt.key === modelSelected
-                      const disabled = !opt.configured || wsStatus !== 'open' || active
-                      return (
-                        <button
-                          key={opt.key}
-                          type="button"
-                          className={'model-row' + (active ? ' active' : '') + (!opt.configured ? ' disabled' : '')}
-                          disabled={disabled}
-                          onClick={() => {
-                            if (window.confirm(lang === 'zh' ? `切换到 ${opt.label}。后续 Agent 请求将使用该模型。继续吗？` : `Switch to ${opt.label}. Future Agent requests will use it. Continue?`)) {
-                              send({ type: 'model:switch', key: opt.key })
-                              setModelOpen(false)
-                            }
-                          }}
-                        >
-                          <span className="model-row-main">
-                            <span className="model-row-title">{opt.label}</span>
-                            <span className="model-row-sub">{opt.modelName}</span>
-                          </span>
-                          <span className={'model-row-badge ' + (active ? 'active' : opt.configured ? 'ok' : 'missing')}>
-                            {active ? (lang === 'zh' ? '当前' : 'Current') : opt.configured ? (lang === 'zh' ? '可用' : 'Ready') : (lang === 'zh' ? '未配置' : 'No key')}
-                          </span>
-                        </button>
-                      )
-                    }
-                    return (
-                      <div className="model-cols">
-                        <div className="model-vendors">
-                          {order.map((v) => {
-                            const list = groups[v]
-                            const hasReady = list.some((o) => o.configured)
-                            const isActiveVendor = v === activeVendor
-                            const isCurrentVendor = modelSelected && vendorOf(modelSelected) === v
-                            return (
-                              <button
-                                key={v}
-                                type="button"
-                                className={'model-vendor' + (isActiveVendor ? ' active' : '') + (!hasReady ? ' dim' : '')}
-                                onClick={() => setVendorSel(v)}
-                              >
-                                <span className="model-vendor-name">{lang === 'zh' ? VENDOR_LABELS[v]?.zh : VENDOR_LABELS[v]?.en ?? v}</span>
-                                <span className="model-vendor-count">{list.length}</span>
-                                {isCurrentVendor && <span className="model-vendor-dot" />}
-                              </button>
-                            )
-                          })}
-                          <button
-                            type="button"
-                            className={'model-vendor custom' + (activeVendor === 'custom' ? ' active' : '')}
-                            onClick={() => setVendorSel('custom')}
-                          >
-                            <span className="model-vendor-name">{lang === 'zh' ? '⚙ 自定义' : '⚙ Custom'}</span>
-                            {modelSelected === 'custom' && <span className="model-vendor-dot" />}
-                          </button>
-                        </div>
-                        <div className="model-models">
-                          {activeVendor === 'custom' ? (
-                            <div className="model-custom-form">
-                              <div className="model-field">
-                                <label className="model-field-label">{lang === 'zh' ? '兼容格式' : 'Format'}</label>
-                                <div className="model-adapt-toggle">
-                                  <button type="button" className={customAdapt === 'openai' ? 'active' : ''} onClick={() => setCustomAdapt('openai')}>OpenAI</button>
-                                  <button type="button" className={customAdapt === 'anthropic' ? 'active' : ''} onClick={() => setCustomAdapt('anthropic')}>Anthropic</button>
-                                </div>
-                              </div>
-                              <div className="model-field">
-                                <label className="model-field-label">{lang === 'zh' ? 'Base URL' : 'Base URL'}</label>
-                                <input
-                                  className="model-input"
-                                  value={customBaseURL}
-                                  onChange={(e) => setCustomBaseURL(e.target.value)}
-                                  placeholder={customAdapt === 'openai' ? 'https://provider/v1' : 'https://provider (不带 /v1)'}
-                                  autoFocus
-                                />
-                              </div>
-                              <div className="model-field">
-                                <label className="model-field-label">{lang === 'zh' ? '模型名' : 'Model name'}</label>
-                                <input
-                                  className="model-input"
-                                  value={customModelName}
-                                  onChange={(e) => setCustomModelName(e.target.value)}
-                                  placeholder="e.g. glm-5-turbo"
-                                />
-                              </div>
-                              <div className="model-field">
-                                <label className="model-field-label">{lang === 'zh' ? 'API Key' : 'API Key'}</label>
-                                <input
-                                  className="model-input"
-                                  type="password"
-                                  value={customKey}
-                                  onChange={(e) => setCustomKey(e.target.value)}
-                                  placeholder={customOpt?.configured ? (lang === 'zh' ? '已设置(重新输入覆盖)' : 'Set (re-enter to overwrite)') : ''}
-                                />
-                              </div>
-                              <button
-                                type="button"
-                                className="model-submit-btn"
-                                disabled={wsStatus !== 'open' || !customBaseURL.trim() || !customModelName.trim() || !customKey.trim()}
-                                onClick={submitCustom}
-                              >
-                                {lang === 'zh' ? '保存并切换' : 'Save & switch'}
-                              </button>
-                              {customOpt?.configured && (
-                                <div className="model-custom-status">
-                                  {lang === 'zh' ? `当前自定义: ${customOpt.modelName}` : `Current custom: ${customOpt.modelName}`}
-                                </div>
-                              )}
-                              <div className="model-custom-hint">
-                                {lang === 'zh'
-                                  ? '提交后写入 .env 持久化,重启后保留。'
-                                  : 'Persisted to .env on submit; survives restart.'}
-                              </div>
-                            </div>
-                          ) : (
-                            vendorModels.map(renderModelRow)
-                          )}
-                        </div>
-                      </div>
-                    )
-                  })()}
-                </div>
-                <div className="model-pop-note">
-                  {lang === 'zh'
-                    ? '已验证模型 key 由 .env 管理;也可在「自定义」里填任意 OpenAI/Anthropic 兼容端点。'
-                    : 'Verified models use .env keys; or fill any OpenAI/Anthropic-compatible endpoint under Custom.'}
-                </div>
-              </div>
-            )}
-          </div>
           <button
             className="tb-btn reset"
             disabled={switching || wsStatus !== 'open'}

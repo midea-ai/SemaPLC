@@ -1,7 +1,9 @@
 import { describe, expect, it, afterEach } from 'vitest'
-import { buildModelRegistry, currentModelConfigState, resolveModel, selectModelKey, setRuntimeCustomConfig, writeCustomToEnv } from '../../server/model-registry'
+import { buildModelRegistry, currentModelConfigState, resolveModel, selectModelKey, setRuntimeModelKey } from '../../server/model-registry'
 
 describe('model registry', () => {
+  afterEach(() => setRuntimeModelKey(null))
+
   it('keeps existing provider aliases and adds OpenAI-compatible providers', () => {
     const models = buildModelRegistry({})
 
@@ -57,19 +59,6 @@ describe('model registry', () => {
 
     expect(resolved?.id).toBe('vendor-model[openai]')
     expect(resolved?.cfg.apiKey).toBe('sk-custom')
-  })
-
-  it('restores custom Anthropic-compatible config from persisted env', () => {
-    const resolved = resolveModel({
-      PLC_MODEL: 'custom',
-      PLC_OPENAI_COMPATIBLE_API_KEY: 'sk-custom',
-      PLC_OPENAI_COMPATIBLE_MODEL: 'vendor-claude',
-      PLC_OPENAI_COMPATIBLE_BASE_URL: 'https://vendor.test',
-      PLC_OPENAI_COMPATIBLE_PROVIDER: 'anthropic',
-    })
-
-    expect(resolved?.id).toBe('vendor-claude[anthropic]')
-    expect(resolved?.cfg.adapt).toBe('anthropic')
   })
 
   it('adds fixed GLM relay model options sharing the OpenAI-compatible endpoint', () => {
@@ -155,64 +144,6 @@ describe('model registry', () => {
     expect(flash?.cfg.modelName).toBe('qwen3.5-flash')
   })
 
-  // 清理运行时 custom 状态,避免测试间泄漏
-  afterEach(() => setRuntimeCustomConfig(null))
-
-  it('uses runtime custom config when setRuntimeCustomConfig is called', () => {
-    // 未设置时:custom 走 fallback(无 apiKey)→ resolveModel 返回 null(缺 key 分支)
-    setRuntimeCustomConfig(null)
-    const before = resolveModel({ PLC_MODEL: 'custom' })
-    expect(before).toBeNull()
-
-    // 设置后:custom 用运行时配置
-    setRuntimeCustomConfig({
-      modelName: 'my-custom-model', provider: 'openai',
-      baseURL: 'https://my.endpoint/v1', apiKey: 'sk-custom',
-      maxTokens: 8000, contextLength: 64000, adapt: 'openai',
-    })
-    const after = resolveModel({ PLC_MODEL: 'custom' })
-    expect(after?.cfg.modelName).toBe('my-custom-model')
-    expect(after?.cfg.baseURL).toBe('https://my.endpoint/v1')
-    expect(after?.cfg.apiKey).toBe('sk-custom')
-    expect(after?.cfg.adapt).toBe('openai')
-  })
-
-  it('writeCustomToEnv persists custom selection idempotently without clobbering unrelated keys', () => {
-    const fs = require('fs')
-    const os = require('os')
-    const path = require('path')
-    const tmp = path.join(os.tmpdir(), `sema-env-${Date.now()}.env`)
-    fs.writeFileSync(tmp, [
-      'PLC_MODEL=minimax',
-      'PLC_OPENAI_COMPATIBLE_API_KEY=old-key',
-      'MINIMAX_API_KEY=keep-me',
-      'PLC_OPENAI_COMPATIBLE_BASE_URL=https://old/v1',
-      '# comment line',
-      '',
-    ].join('\n'), 'utf8')
-
-    writeCustomToEnv(tmp, {
-      modelName: 'glm-x', provider: 'openai',
-      baseURL: 'https://new/v1', apiKey: 'sk-new',
-      maxTokens: 32000, contextLength: 128000, adapt: 'openai',
-    })
-
-    const out = fs.readFileSync(tmp, 'utf8')
-    // 更新了 PLC_MODEL + PLC_OPENAI_COMPATIBLE_* selection/config.
-    expect(out).toContain('PLC_MODEL=custom')
-    expect(out).toContain('PLC_OPENAI_COMPATIBLE_BASE_URL=https://new/v1')
-    expect(out).toContain('PLC_OPENAI_COMPATIBLE_API_KEY=sk-new')
-    expect(out).toContain('PLC_OPENAI_COMPATIBLE_MODEL=glm-x')
-    expect(out).toContain('PLC_OPENAI_COMPATIBLE_PROVIDER=openai')
-    // 保留其它内容
-    expect(out).toContain('MINIMAX_API_KEY=keep-me')
-    expect(out).toContain('# comment line')
-    // 不应有重复行
-    expect(out.match(/PLC_MODEL=/g)?.length).toBe(1)
-    expect(out.match(/PLC_OPENAI_COMPATIBLE_API_KEY=/g)?.length).toBe(1)
-    fs.unlinkSync(tmp)
-  })
-
   it('logs and skips selected providers with missing keys', () => {
     const logs: string[] = []
     const resolved = resolveModel({ PLC_MODEL: 'xai' }, (_level, message) => logs.push(message))
@@ -223,38 +154,41 @@ describe('model registry', () => {
 
   it('exposes only verified model options without API keys', () => {
     const state = currentModelConfigState({
-      PLC_MODEL: 'gemini',
+      PLC_MODEL: 'gemini-3.5-flash',
       GEMINI_API_KEY: 'gemini-secret',
     })
 
-    expect(state.selected).toBe('gemini')
-    expect(state.active?.id).toBe('gemini-2.5-flash[openai]')
-    expect(state.options.map((o) => o.key)).toEqual([
+    expect(state.selected).toBe('gemini-3.5-flash')
+    expect(state.active?.id).toBe('gemini-3.5-flash[openai]')
+    // 内置(非 custom)选项恰为 VERIFIED_MODEL_KEYS(顺序一致)。过滤掉 custom:*,
+    // 避免依赖 cwd 里可能存在的 custom-models.json。
+    expect(state.options.filter((o) => !o.key.startsWith('custom')).map((o) => o.key)).toEqual([
+      'deepseek',
+      'anthropic',
+      'openai',
+      'xai',
       'minimax',
+      'minimax-m2.7',
       'doubao',
       'doubao-turbo',
       'doubao-code',
       'qwen',
       'qwen-plus',
       'qwen-flash',
-      'gemini',
-      'groq',
-      'groq-gpt-oss-20b',
-      'groq-llama-3.3-70b',
-      'groq-qwen3-32b',
-      'groq-qwen3.6-27b',
+      'gemini-3.5-flash',
+      'gemini-3.1-pro',
+      'openrouter',
+      'kimi',
+      'zai',
       'bigmodel',
-      'openai-compatible',
-      'glm-4.7',
-      'glm-5-turbo',
-      'custom',
+      'siliconflow',
     ])
-    expect(state.options.find((o) => o.key === 'gemini')).toMatchObject({ configured: true, status: 'verified' })
-    // The custom endpoint has no key in this env, so it surfaces as not configured.
-    expect(state.options.find((o) => o.key === 'bigmodel')).toMatchObject({ configured: false })
-    expect(state.options.find((o) => o.key === 'openai-compatible')).toMatchObject({ configured: false })
-    expect(state.options.find((o) => o.key === 'glm-4.7')).toMatchObject({ configured: false })
-    expect(state.options.find((o) => o.key === 'glm-5-turbo')).toMatchObject({ configured: false })
+    // 唯一配了 key 的是 gemini-3.5-flash(共享 GEMINI_API_KEY 的 gemini-3.1-pro 也配上了)。
+    expect(state.options.find((o) => o.key === 'gemini-3.5-flash')).toMatchObject({ configured: true, status: 'verified' })
+    expect(state.options.find((o) => o.key === 'gemini-3.1-pro')).toMatchObject({ configured: true })
+    // 未配 key 的模型:configured=false,且带上要设置的 env 变量名 envHint。
+    expect(state.options.find((o) => o.key === 'bigmodel')).toMatchObject({ configured: false, envHint: 'BIGMODEL_API_KEY' })
+    expect(state.options.find((o) => o.key === 'deepseek')).toMatchObject({ configured: false, envHint: 'DEEPSEEK_API_KEY' })
     expect(JSON.stringify(state)).not.toContain('gemini-secret')
   })
 })
