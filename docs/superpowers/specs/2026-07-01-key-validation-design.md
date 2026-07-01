@@ -9,11 +9,15 @@
 
 ## 决策(已敲定)
 
-- **策略 A:测不过就不保存,原地报错。** 保证落盘的 key 都是当时探通的。
+- **策略 B(软门禁):默认测不过就不保存、原地报错;但给用户「仍然保存(跳过校验)」的越过口子。**
+  最初定的是纯策略 A(硬门禁),但 code review 发现探针的 URL 规整
+  (`apiUtil.buildApiUrl`,含 `/v\d+` 段就不加 `/v1`)与运行时(`openai.js`,仅
+  `endsWith('/v1')` 才不加)**并不一致**,在 baseURL 含 `/vN` 但不以 `/v1` 结尾的模型
+  (如 gemini `/v1beta/openai`、zai `/api/paas/v4`)上会拼出不同 URL → 探针可能误报失败。
+  硬拦会误伤好 key,故改为软门禁:探针失败时不自动保存,由用户 `force` 越过。
 - **只在填 key 保存这一次校验。** 不做周期性 / 重复重测。
 - **运行时 key 失效** 沿用现有 `session:error` 提示,**绝不删** 已存的 key。
 - **失败信息带上可复制的 curl 调试命令**,方便手动排查是 key 错还是端点抽风。
-- 已知代价:高延迟中转端点的探针偶发误报,会把对的 key 挡在外面(用户接受)。
 
 ## 校验探针(现成能力)
 
@@ -28,8 +32,13 @@ SemaCore 实例暴露 `testApiConnection(params: ApiTestParams): Promise<ApiTest
 新增一条服务端→前端消息(`shared/protocol.ts` 的 `ServerMessage`):
 
 ```ts
+// client → server
+{ type: 'model:set-key'; key: string; apiKey: string; force?: boolean }
+// server → client(校验结果)
 { type: 'model:key-result'; key: string; ok: boolean; message?: string; curl?: string }
 ```
+
+`force?: boolean`:用户在校验失败后点「仍然保存」时为 `true`,后端据此跳过探针直接落盘。
 
 - `key`:发起校验的模型选项 key(前端据此只让对应弹窗响应)。
 - `ok`:探针是否通过。
@@ -44,9 +53,9 @@ SemaCore 实例暴露 `testApiConnection(params: ApiTestParams): Promise<ApiTest
 2. `val = m.apiKey.trim()`;为空 → 回 `error`。
 3. 从 `buildModelRegistry()` 取该 key 的 `cfg`,构造
    `params = { provider: cfg.provider, baseURL: cfg.baseURL, modelName: cfg.modelName, apiKey: val, adapt: cfg.adapt }`。
-4. 兜底:若 `this.core` 不存在,跳过校验直接按成功路径保存(极少见,不阻塞用户)。
-5. `const r = await this.core.testApiConnection(params)`(整段包 try/catch,异常按失败处理)。
-6. **成功**(`r.success`):
+4. 跳过探针:若 `m.force`(用户点了「仍然保存」)或 `this.core` 不存在,直接走成功路径保存。
+5. 否则 `const r = await this.core.testApiConnection(params)`(整段包 try/catch,异常按失败处理)。
+6. **成功**(`r.success` 或跳过探针):
    - `saveKeyOverride(envKey, val)`;
    - 若 `resolveModel().selected === m.key` → `applyModel` 真正激活;
    - `emitModelConfig()`;
@@ -65,8 +74,11 @@ SemaCore 实例暴露 `testApiConnection(params: ApiTestParams): Promise<ApiTest
   - 失败 → `keyError = { message, curl }`,保留已输入的 key 让用户改。
 - 弹窗渲染:
   - `keyChecking` 时保存按钮显示「校验中…」并禁用(取消仍可用);
-  - `keyError` 时:红字原因(多行自适应)+ 一个可复制的 curl 块(带复制按钮);
+  - `keyError` 时:红字原因(多行自适应)+ 一个可复制的 curl 块(带复制按钮)
+    + 一个「仍然保存(跳过校验)」按钮 → `submitKey(true)` 发 `force`;
   - 关闭 / 切换目标模型时重置 `keyChecking` `keyError`。
+- 注意 `submitKey(force=false)`:保存按钮须用 `onClick={() => submitKey(false)}` 包一层,
+  否则 `onClick={submitKey}` 会把 `MouseEvent` 当作 `force` 传入 → 每次保存都跳过校验。
 
 ## 非目标(YAGNI)
 
