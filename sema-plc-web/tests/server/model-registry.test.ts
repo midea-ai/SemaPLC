@@ -7,7 +7,9 @@ describe('model registry', () => {
   it('keeps existing provider aliases and adds OpenAI-compatible providers', () => {
     const models = buildModelRegistry({})
 
-    expect(models.deepseek.modelName).toBe('deepseek-chat')
+    expect(models.deepseek.modelName).toBe('deepseek-v4-flash')
+    expect(models['deepseek-v4-pro'].modelName).toBe('deepseek-v4-pro')
+    expect(models['deepseek-v4-pro'].baseURL).toBe('https://api.deepseek.com/v1')
     expect(models.minimax.modelName).toBe('MiniMax-M3')
     expect(models.gemini.modelName).toBe('gemini-2.5-flash')
     expect(models.qwen.modelName).toBe('qwen3.7-max')
@@ -164,8 +166,10 @@ describe('model registry', () => {
     // 避免依赖 cwd 里可能存在的 custom-models.json。
     expect(state.options.filter((o) => !o.key.startsWith('custom')).map((o) => o.key)).toEqual([
       'deepseek',
+      'deepseek-v4-pro',
       'anthropic',
       'openai',
+      'gpt-5.5',
       'xai',
       'minimax',
       'minimax-m2.7',

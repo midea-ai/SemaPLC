@@ -58,7 +58,7 @@ export function TopBar() {
     if (key.startsWith('gemini')) return 'gemini'
     if (key === 'deepseek' || key === 'deepseek-v4-pro') return 'deepseek'
     if (key === 'anthropic') return 'anthropic'
-    if (key === 'openai') return 'openai'
+    if (key === 'openai' || key === 'gpt-5.5') return 'openai'
     if (key === 'xai') return 'xai'
     if (key === 'openrouter') return 'openrouter'
     if (key === 'kimi' || key === 'moonshot') return 'kimi'
@@ -76,7 +76,7 @@ export function TopBar() {
     doubao: { zh: '豆包', en: 'Doubao' },
     qwen: { zh: '通义千问', en: 'Qwen' },
     bigmodel: { zh: 'BigModel', en: 'BigModel' },
-    zai: { zh: '智谱', en: 'Zhipu' },
+    zai: { zh: 'zai', en: 'zai' },
     siliconflow: { zh: 'SiliconFlow', en: 'SiliconFlow' },
     openrouter: { zh: 'OpenRouter', en: 'OpenRouter' },
     kimi: { zh: 'Kimi', en: 'Kimi' },
@@ -223,8 +223,7 @@ export function TopBar() {
                       onClick={() => openKeyModal(opt.key)}
                     >
                       <span className="model-row-main">
-                        <span className="model-row-title">{lang === 'en' ? (opt.labelEn ?? opt.label) : opt.label}</span>
-                        <span className="model-row-sub">{opt.modelName}</span>
+                        <span className="model-row-title">{opt.modelName}</span>
                       </span>
                       <span className="model-row-badge missing">＋ {lang === 'zh' ? '填 key' : 'Add key'}{opt.envHint && <span className="model-row-env"> {opt.envHint}</span>}</span>
                     </button>
@@ -245,8 +244,7 @@ export function TopBar() {
                     }}
                   >
                     <span className="model-row-main">
-                      <span className="model-row-title">{lang === 'en' ? (opt.labelEn ?? opt.label) : opt.label}</span>
-                      <span className="model-row-sub">{opt.modelName}</span>
+                      <span className="model-row-title">{opt.modelName}</span>
                     </span>
                     {active && (
                       <span className="model-row-badge active"><span className="model-row-led" />{lang === 'zh' ? '当前' : 'Active'}</span>

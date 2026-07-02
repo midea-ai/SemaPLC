@@ -72,12 +72,14 @@ You should see four lines once it's up:
 
 | `PLC_MODEL` | Model | Key |
 |---|---|---|
-| `deepseek` | deepseek-chat | `DEEPSEEK_API_KEY` |
+| `deepseek` | deepseek-v4-flash | `DEEPSEEK_API_KEY` |
+| `deepseek-v4-pro` | deepseek-v4-pro | `DEEPSEEK_API_KEY` |
 | `minimax` / `minimax-m3` | MiniMax-M3 | `MINIMAX_API_KEY` |
 | `minimax-m2.7` / `minimax-m2.5` | MiniMax-M2.7 / M2.5 | `MINIMAX_API_KEY` |
 | `anthropic` | claude-opus-4-7 | `ANTHROPIC_API_KEY` |
 | `gemini` / `gemini-2.5-flash` / `gemini-2.5-pro` | Gemini 2.5 | `GEMINI_API_KEY` |
 | `openai` | gpt-5.4 | `OPENAI_API_KEY` |
+| `gpt-5.5` | gpt-5.5 | `OPENAI_API_KEY` |
 | `xai` | grok-4.3 | `XAI_API_KEY` |
 | `groq` | openai/gpt-oss-120b | `GROQ_API_KEY` |
 | `openrouter` | ~openai/gpt-latest | `OPENROUTER_API_KEY` |

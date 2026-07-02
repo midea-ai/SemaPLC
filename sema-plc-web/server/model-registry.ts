@@ -158,19 +158,19 @@ export function buildModelRegistry(env: NodeJS.ProcessEnv = process.env): Record
   })
 
   const registry: Record<string, ModelConfig> = {
+    // DeepSeek 官方两档:Flash / Pro,同一 api.deepseek.com。共享 DEEPSEEK 前缀(同 doubao/qwen 模式)→
+    // DEEPSEEK_API_KEY / DEEPSEEK_BASE_URL 两档都生效,只 modelName 缺省值不同。
     deepseek: openAICompatible(env, 'DEEPSEEK', {
-      modelName: env.DEEPSEEK_MODEL ?? 'deepseek-chat',
+      modelName: 'deepseek-v4-flash',
       provider: 'custom',
       baseURL: 'https://api.deepseek.com/v1',
-      apiKey: env.DEEPSEEK_API_KEY,
       maxTokens: 8192,
       contextLength: 64000,
     }),
-    'deepseek-v4-pro': openAICompatible(env, 'DEEPSEEK_V4_PRO', {
-      modelName: env.DEEPSEEK_V4_PRO_MODEL ?? 'deepseek-v4-pro',
+    'deepseek-v4-pro': openAICompatible(env, 'DEEPSEEK', {
+      modelName: 'deepseek-v4-pro',
       provider: 'custom',
-      baseURL: 'https://aimpapi.midea.com/t-aigc/aimp-deepseek-v4-pro/v1',
-      apiKey: env.DEEPSEEK_V4_PRO_API_KEY,
+      baseURL: 'https://api.deepseek.com/v1',
       maxTokens: 8192,
       contextLength: 64000,
     }),
@@ -181,8 +181,16 @@ export function buildModelRegistry(env: NodeJS.ProcessEnv = process.env): Record
       contextLength: 200000,
     }),
 
+    // OpenAI 官方两档:GPT-5.4 / GPT-5.5,同一 api.openai.com。共享 OPENAI 前缀 → OPENAI_API_KEY /
+    // OPENAI_BASE_URL 两档都生效,只 modelName 缺省值不同(同 deepseek 上面的模式)。
     openai: openAICompatible(env, 'OPENAI', {
       modelName: 'gpt-5.4',
+      baseURL: 'https://api.openai.com/v1',
+      maxTokens: 32000,
+      contextLength: 400000,
+    }),
+    'gpt-5.5': openAICompatible(env, 'OPENAI', {
+      modelName: 'gpt-5.5',
       baseURL: 'https://api.openai.com/v1',
       maxTokens: 32000,
       contextLength: 400000,
@@ -299,8 +307,10 @@ export const FALLBACK_MODEL_ORDER = [
 
 export const VERIFIED_MODEL_KEYS = [
   'deepseek',
+  'deepseek-v4-pro',
   'anthropic',
   'openai',
+  'gpt-5.5',
   'xai',
   'minimax',
   'minimax-m2.7',
@@ -320,9 +330,11 @@ export const VERIFIED_MODEL_KEYS = [
 ] as const
 
 const VERIFIED_LABELS: Record<string, string> = {
-  deepseek: 'DeepSeek',
+  deepseek: 'DeepSeek V4 Flash',
+  'deepseek-v4-pro': 'DeepSeek V4 Pro',
   anthropic: 'Anthropic Claude',
-  openai: 'OpenAI',
+  openai: 'OpenAI GPT-5.4',
+  'gpt-5.5': 'OpenAI GPT-5.5',
   xai: 'xAI Grok',
   minimax: 'MiniMax M3',
   'minimax-m2.7': 'MiniMax M2.7',
@@ -336,16 +348,18 @@ const VERIFIED_LABELS: Record<string, string> = {
   'gemini-3.1-pro': 'Google Gemini 3.1 Pro',
   openrouter: 'OpenRouter',
   kimi: 'Kimi K2.6',
-  zai: '智谱 GLM-5.2',
+  zai: 'zai',
   bigmodel: 'BigModel GLM-5.2',
   siliconflow: 'SiliconFlow GLM-5.2',
 }
 
 // English labels for the model picker (UI language = en).
 const VERIFIED_LABELS_EN: Record<string, string> = {
-  deepseek: 'DeepSeek',
+  deepseek: 'DeepSeek V4 Flash',
+  'deepseek-v4-pro': 'DeepSeek V4 Pro',
   anthropic: 'Anthropic Claude',
-  openai: 'OpenAI',
+  openai: 'OpenAI GPT-5.4',
+  'gpt-5.5': 'OpenAI GPT-5.5',
   xai: 'xAI Grok',
   minimax: 'MiniMax M3',
   'minimax-m2.7': 'MiniMax M2.7',
@@ -359,15 +373,17 @@ const VERIFIED_LABELS_EN: Record<string, string> = {
   'gemini-3.1-pro': 'Google Gemini 3.1 Pro',
   openrouter: 'OpenRouter',
   kimi: 'Kimi K2.6',
-  zai: 'Zhipu GLM-5.2',
+  zai: 'zai',
   bigmodel: 'BigModel GLM-5.2',
   siliconflow: 'SiliconFlow GLM-5.2',
 }
 
 const ENV_HINTS: Record<string, string> = {
   deepseek: 'DEEPSEEK_API_KEY',
+  'deepseek-v4-pro': 'DEEPSEEK_API_KEY',
   anthropic: 'ANTHROPIC_API_KEY',
   openai: 'OPENAI_API_KEY',
+  'gpt-5.5': 'OPENAI_API_KEY',
   xai: 'XAI_API_KEY',
   minimax: 'MINIMAX_API_KEY',
   'minimax-m2.7': 'MINIMAX_API_KEY',
