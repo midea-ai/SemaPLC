@@ -5,6 +5,7 @@
 #   ./dev.sh                       # 默认:deepseek + 思考开
 #   PLC_THINKING=0 ./dev.sh        # 关思考(跑 deepseek 强烈建议,避开 8192 输出上限的 max_tokens 截断)
 #   PLC_MODEL=minimax-m2.7 ./dev.sh
+#   PLC_MODEL=openai ./dev.sh
 set -euo pipefail
 
 # 脚本位于 sema-plc-web/,仓库根是其上一级 —— 路径全部相对推导,可任意位置 clone。
@@ -12,7 +13,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 # ===== 可调参数(均可用环境变量覆盖)=====
-PLC_MODEL="${PLC_MODEL:-deepseek}"          # 模型: deepseek / minimax-m2.7 / minimax-m2.5 / anthropic ...
+PLC_MODEL="${PLC_MODEL:-deepseek}"          # 模型: deepseek / minimax-m2.7 / anthropic / openai / xai / qwen / openai-compatible ...
 PLC_THINKING="${PLC_THINKING:-1}"           # 思考: 1=开(默认) 0=关。deepseek 输出上限仅 8192,思考易撑爆 → 建议 0
 WORKSPACE="${WORKSPACE:-/tmp/plc-ver-ws}"   # agent 工作区
 ENV_FILE="${ENV_FILE:-$SCRIPT_DIR/.env}"    # API key 来源(从 .env.example 复制)

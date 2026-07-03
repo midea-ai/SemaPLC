@@ -26,7 +26,7 @@ The repository ships two products that work together:
 
 | Package | Role |
 |:--------|:-----|
-| **[`sema-plc-web`](sema-plc-web/)** | The Agent-driven IDE. A localhost web app (React + Vite frontend, Node backend) that embeds the sema-core Agent and visualizes ST → ladder + live vars + 过程仿真 + tool-call log. |
+| **[`sema-plc-web`](sema-plc-web/)** | The Agent-driven IDE. A localhost web app (React + Vite frontend, Node backend) that embeds the sema-core Agent and visualizes ST → ladder + live vars + process simulation + tool-call log. |
 | **[`sema-plc-tools`](sema-plc-tools/)** | The PLC toolchain that makes the IDE work. Usable two ways — as an **MCP server** an agent drives, or as a **standalone CLI** you run from the terminal — it covers the full loop (syntax-check → compile → upload → run → read / force / trace variables), and ships the OpenPLC Runtime Docker environment. |
 
 ## ✨ Features
@@ -82,7 +82,7 @@ See [`sema-plc-tools/README.md`](sema-plc-tools/README.md) for the full command 
 
 - **Node.js ≥ 18** and **npm**
 - **Docker** (Docker Desktop on macOS / Windows) — for the OpenPLC Runtime container
-- An **LLM API key** (DeepSeek recommended; MiniMax / Anthropic / Gemini also supported)
+- An **LLM API key** (DeepSeek recommended; OpenAI-compatible providers such as MiniMax / Anthropic / Gemini / OpenAI / xAI / Groq / OpenRouter / Qwen / Kimi are also supported)
 
 ### Setup
 
@@ -114,6 +114,7 @@ One command brings up everything — starts the OpenPLC container, rebuilds the 
 # from sema-plc-web/
 ./dev.sh                       # default: deepseek
 PLC_MODEL=minimax-m2.7 ./dev.sh
+PLC_MODEL=openai ./dev.sh
 ```
 
 When it's up you'll see:
@@ -125,7 +126,7 @@ When it's up you'll see:
 [VITE]   ➜  Local:   http://localhost:5173/
 ```
 
-Open **<http://localhost:5173>** and describe a control requirement in the chat panel. For manual step-by-step startup, model options, and configuration, see **[sema-plc-web/README.md](sema-plc-web/README.md)**.
+Open **<http://localhost:5173>** and describe a control requirement in the chat panel. For manual step-by-step startup, model options, supported providers, and configuration, see **[sema-plc-web/README.md](sema-plc-web/README.md)**.
 
 > First run builds the OpenPLC Docker image (incl. the `rusty` checker from source), which can take several minutes. The container exposes its REST API on `https://localhost:8443` with a self-signed certificate. The image is self-contained — no private images required.
 

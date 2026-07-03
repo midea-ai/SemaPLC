@@ -20,6 +20,10 @@ export type InternalMessage =
   | { type: 'internal:editor-save'; path?: string; stCode: string }
   | { type: 'internal:editor-open'; path: string }   // P2
   | { type: 'internal:session-reset' }
+  | { type: 'internal:model-switch'; key: string }
+  | { type: 'internal:custom-add'; baseURL: string; apiKey: string; modelName: string; adapt: 'openai' | 'anthropic' }
+  | { type: 'internal:custom-delete'; id: string }
+  | { type: 'internal:set-key'; key: string; apiKey: string; force?: boolean }
   | { type: 'internal:client-connected' }
 
 export type BusMessage = ServerMessage | InternalMessage

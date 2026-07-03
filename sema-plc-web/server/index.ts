@@ -1,4 +1,10 @@
+// 必须最先执行:抹掉 OpenAI SDK 的 UA/x-stainless 指纹,否则第三方中转站会 403。
+// 详见 relay-fetch-fix.ts。
+import { installRelayHeaderFix } from './relay-fetch-fix.js'
+installRelayHeaderFix()
+
 import { loadConfig } from './config.js'
+import { applyKeyOverrides } from './key-overrides.js'
 import { createHttpServer } from './http-server.js'
 import { WsGateway } from './ws-gateway.js'
 import { SemaBridge } from './sema-bridge.js'
@@ -6,6 +12,9 @@ import { PlcMonitor } from './plc-monitor.js'
 import { PlcController } from './plc-controller.js'
 
 const cfg = loadConfig()
+// UI 里为未配置模型填过的 API key:merge 进 process.env(.env/shell 已有的优先),
+// 必须在 SemaBridge 构建 registry 之前执行,否则填过的 key 重启后读不到。
+applyKeyOverrides()
 console.log(`[plc-vis-web] workspace = ${cfg.workspace}`)
 console.log(`[plc-vis-web] http :${cfg.httpPort}, ws :${cfg.wsPort}`)
 

@@ -14,7 +14,7 @@ Localhost, Agent-driven IDE for OpenPLC. Type a control task in plain language i
 
 - **Node.js ≥ 18** and **npm**
 - **Docker** running (for the OpenPLC runtime container)
-- **An LLM API key** — DeepSeek recommended; MiniMax / Anthropic / Gemini also supported
+- **An LLM API key** — DeepSeek recommended; MiniMax, Anthropic, Gemini, OpenAI, xAI, Groq, OpenRouter, Qwen, Kimi, Z.AI, SiliconFlow, Together, and OpenAI-compatible endpoints are supported
 
 ## Quick start (one command)
 
@@ -68,17 +68,42 @@ You should see four lines once it's up:
 
 ## Choosing the model
 
-`PLC_MODEL` picks the LLM; provide the matching `*_API_KEY`. If `PLC_MODEL` is unset, it falls back by key priority (DEEPSEEK > MINIMAX > ANTHROPIC > GEMINI).
+`PLC_MODEL` picks the LLM; provide the matching `*_API_KEY`. If `PLC_MODEL` is unset, it falls back by key priority: `DEEPSEEK`, `MINIMAX`, `ANTHROPIC`, `GEMINI`, then the newer OpenAI-compatible providers listed below.
 
 | `PLC_MODEL` | Model | Key |
 |---|---|---|
-| `deepseek` | deepseek-chat | `DEEPSEEK_API_KEY` |
+| `deepseek` | deepseek-v4-flash | `DEEPSEEK_API_KEY` |
+| `deepseek-v4-pro` | deepseek-v4-pro | `DEEPSEEK_API_KEY` |
 | `minimax` / `minimax-m3` | MiniMax-M3 | `MINIMAX_API_KEY` |
 | `minimax-m2.7` / `minimax-m2.5` | MiniMax-M2.7 / M2.5 | `MINIMAX_API_KEY` |
 | `anthropic` | claude-opus-4-7 | `ANTHROPIC_API_KEY` |
 | `gemini` / `gemini-2.5-flash` / `gemini-2.5-pro` | Gemini 2.5 | `GEMINI_API_KEY` |
+| `openai` | gpt-5.4 | `OPENAI_API_KEY` |
+| `gpt-5.5` | gpt-5.5 | `OPENAI_API_KEY` |
+| `xai` | grok-4.3 | `XAI_API_KEY` |
+| `groq` | openai/gpt-oss-120b | `GROQ_API_KEY` |
+| `openrouter` | ~openai/gpt-latest | `OPENROUTER_API_KEY` |
+| `qwen` / `dashscope` | qwen-plus | `QWEN_API_KEY` |
+| `kimi` / `moonshot` | kimi-k2.6 | `KIMI_API_KEY` |
+| `zai` / `zhipu` | glm-4.7 | `ZAI_API_KEY` |
+| `siliconflow` | Pro/zai-org/GLM-4.7 | `SILICONFLOW_API_KEY` |
+| `together` | MiniMaxAI/MiniMax-M3 | `TOGETHER_API_KEY` |
+| `ollama` | qwen2.5-coder:32b | optional `OLLAMA_API_KEY` |
+| `openai-compatible` / `custom` | your model | `PLC_OPENAI_COMPATIBLE_API_KEY` |
 
-All MiniMax variants share one `MINIMAX_API_KEY`; switch models by changing `PLC_MODEL` only. Gemini uses the OpenAI-compatible endpoint; the 2.5 series runs the full tool loop (Gemini 3.x is not yet supported — it requires `thought_signature` round-tripping the embedded adapter doesn't do yet).
+Every preset supports overrides: `<PREFIX>_MODEL`, `<PREFIX>_BASE_URL`, `<PREFIX>_MAX_TOKENS`, and `<PREFIX>_CONTEXT_LENGTH` (for example `OPENAI_MODEL`, `QWEN_BASE_URL`, or `GROQ_MAX_TOKENS`). The generic OpenAI-compatible entry uses `PLC_OPENAI_COMPATIBLE_MODEL`, `PLC_OPENAI_COMPATIBLE_BASE_URL`, `PLC_OPENAI_COMPATIBLE_API_KEY`, `PLC_OPENAI_COMPATIBLE_MAX_TOKENS`, and `PLC_OPENAI_COMPATIBLE_CONTEXT_LENGTH`.
+
+All MiniMax variants share one `MINIMAX_API_KEY`; switch models by changing `PLC_MODEL` only. Gemini uses the OpenAI-compatible endpoint; the 2.5 series runs the full tool loop (Gemini 3.x entries are still experimental because they require `thought_signature` round-tripping in the embedded adapter).
+
+Example custom endpoint:
+
+```bash
+PLC_MODEL=openai-compatible
+PLC_OPENAI_COMPATIBLE_API_KEY=sk-...
+PLC_OPENAI_COMPATIBLE_MODEL=my-agentic-model
+PLC_OPENAI_COMPATIBLE_BASE_URL=https://provider.example/v1
+PLC_OPENAI_COMPATIBLE_PROVIDER=openai
+```
 
 ## Usage
 

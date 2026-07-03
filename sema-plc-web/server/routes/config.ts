@@ -1,5 +1,6 @@
 import { Router } from 'express'
 import type { Config } from '../config.js'
+import { currentModelConfigState } from '../model-registry.js'
 
 export function configRouter(cfg: Config): Router {
   const r = Router()
@@ -9,6 +10,7 @@ export function configRouter(cfg: Config): Router {
       httpPort: cfg.httpPort,
       wsPort: cfg.wsPort,
       version: '0.2.0',
+      model: currentModelConfigState(),
     })
   })
   return r

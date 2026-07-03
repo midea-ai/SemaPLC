@@ -1,2 +1,5 @@
 dist/
 dist-server/
+.env
+custom-models.json
+key-overrides.json
