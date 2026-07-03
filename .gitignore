@@ -48,3 +48,7 @@ session-analysis/
 
 # 临时调试抓包产物(GLM 请求/响应复现等),不入库
 tmp/
+
+# 文档目录不纳入版本库(README logo 资产除外,见上方 !docs/images/*)
+docs/
+!docs/images/

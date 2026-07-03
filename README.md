@@ -26,7 +26,7 @@ The repository ships two products that work together:
 
 | Package | Role |
 |:--------|:-----|
-| **[`sema-plc-web`](sema-plc-web/)** | The Agent-driven IDE. A localhost web app (React + Vite frontend, Node backend) that embeds the sema-core Agent and visualizes ST → ladder + live vars + 过程仿真 + tool-call log. |
+| **[`sema-plc-web`](sema-plc-web/)** | The Agent-driven IDE. A localhost web app (React + Vite frontend, Node backend) that embeds the sema-core Agent and visualizes ST → ladder + live vars + process simulation + tool-call log. |
 | **[`sema-plc-tools`](sema-plc-tools/)** | The PLC toolchain that makes the IDE work. Usable two ways — as an **MCP server** an agent drives, or as a **standalone CLI** you run from the terminal — it covers the full loop (syntax-check → compile → upload → run → read / force / trace variables), and ships the OpenPLC Runtime Docker environment. |
 
 ## ✨ Features
