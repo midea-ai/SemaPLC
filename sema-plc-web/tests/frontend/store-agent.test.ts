@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { useAgentStore, subscribeAgentToWs } from '../../src/store/agent'
+import { useAgentStore, subscribeAgentToWs, handleAgentWsMessage } from '../../src/store/agent'
 import type { ServerMessage } from '../../shared/protocol'
 
 beforeEach(async () => {
@@ -35,5 +35,45 @@ describe('agent store — todos', () => {
     useAgentStore.getState().setTodos([{ id: '1', title: 'x', status: 'pending' }])
     useAgentStore.getState().clear()
     expect(useAgentStore.getState().todos).toEqual([])
+  })
+})
+
+// 刷新网页 → store 重建从 localStorage 恢复(persist)。这是修“刷新丢聊天历史”的回归保护。
+describe('agent store — 刷新持久化 (persist)', () => {
+  beforeEach(() => {
+    useAgentStore.getState().clear()
+    localStorage.clear()
+  })
+
+  it('刷新后 persist 从 localStorage 自动 hydrate 恢复历史', async () => {
+    // 等价于"上次会话已落盘 → 浏览器刷新 → store 重建时 persist 自动 hydrate"。
+    // （注意：真实刷新不调 clear()——那会把空值写回 storage；这里是手动落盘后直接 rehydrate。）
+    localStorage.setItem('semaplc:agent-chat', JSON.stringify({
+      state: { sessionId: null, messages: [
+        { id: 'u1', kind: 'user', text: 'hi', ts: 1 },
+        { id: 't1', kind: 'agent', blocks: [], status: 'done', ts: 2 },
+      ] },
+      version: 0,
+    }))
+    expect(useAgentStore.getState().messages).toHaveLength(0)
+    await useAgentStore.persist.rehydrate()
+    expect(useAgentStore.getState().messages.map((m) => m.kind)).toEqual(['user', 'agent'])
+  })
+
+  it('写入后落盘，且 partialize 只存 messages + sessionId（不存瞬时态）', () => {
+    useAgentStore.getState().appendUser('hello')
+    handleAgentWsMessage({ type: 'agent:turn-start', turnId: 'T1' })
+    handleAgentWsMessage({ type: 'agent:turn-end', turnId: 'T1', status: 'done' })
+    const parsed = JSON.parse(localStorage.getItem('semaplc:agent-chat')!)
+    expect(parsed.state.messages.map((m: { kind: string }) => m.kind)).toEqual(['user', 'agent'])
+    expect(parsed.state).not.toHaveProperty('state')
+    expect(parsed.state).not.toHaveProperty('todos')
+  })
+
+  it('streaming 的进行中 turn 不持久化（避免刷新后卡死在 streaming）', () => {
+    handleAgentWsMessage({ type: 'agent:turn-start', turnId: 'Ts' }) // turn 容器默认 status=streaming
+    const raw = localStorage.getItem('semaplc:agent-chat')!
+    const parsed = JSON.parse(raw)
+    expect(parsed.state.messages).toHaveLength(0) // 被 partialize 过滤掉
   })
 })

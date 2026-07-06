@@ -24,6 +24,7 @@ export type InternalMessage =
   | { type: 'internal:custom-add'; baseURL: string; apiKey: string; modelName: string; adapt: 'openai' | 'anthropic' }
   | { type: 'internal:custom-delete'; id: string }
   | { type: 'internal:set-key'; key: string; apiKey: string; force?: boolean }
+  | { type: 'internal:set-thinking'; enabled: boolean }
   | { type: 'internal:client-connected' }
 
 export type BusMessage = ServerMessage | InternalMessage

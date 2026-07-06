@@ -26,6 +26,7 @@ export type ModelConfigState = {
   selected: string | null
   active: { key: string; id: string; provider: string; modelName: string } | null
   options: VerifiedModelOption[]
+  thinking: boolean
 }
 
 type ModelDefaults = {
@@ -48,6 +49,18 @@ export function getRuntimeModelKey(): string | null {
 
 export function setRuntimeModelKey(key: string | null): void {
   runtimeModelKey = key
+}
+
+// 思考模式：运行时 in-memory 覆盖（与 runtimeModelKey 同模式，重启回 env 默认）。
+// null = 用户未切过 → 取 env.PLC_THINKING（默认开）；非 null = 用户切换后的值。
+let runtimeThinking: boolean | null = null
+
+export function getRuntimeThinking(env: NodeJS.ProcessEnv = process.env): boolean {
+  return runtimeThinking ?? (env.PLC_THINKING !== '0')
+}
+
+export function setRuntimeThinking(enabled: boolean): void {
+  runtimeThinking = enabled
 }
 
 // 自定义模型 → ModelConfig。自定义列表由 custom-models.ts 持久化(见 buildModelRegistry)。
@@ -449,7 +462,7 @@ export function currentModelConfigState(env: NodeJS.ProcessEnv = process.env): M
   const active = selected && cfg?.apiKey && cfg.modelName && cfg.baseURL && isAsciiApiKey(cfg.apiKey)
     ? { key: selected, id: `${cfg.modelName}[${cfg.provider}]`, provider: cfg.provider, modelName: cfg.modelName }
     : null
-  return { selected, active, options: verifiedModelOptions(env) }
+  return { selected, active, options: verifiedModelOptions(env), thinking: getRuntimeThinking(env) }
 }
 
 export function selectModelKey(env: NodeJS.ProcessEnv = process.env, models = buildModelRegistry(env)): string | undefined {

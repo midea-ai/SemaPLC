@@ -10,6 +10,7 @@ export const useModelStore = create<ModelStore>((set) => ({
   selected: null,
   active: null,
   options: [],
+  thinking: true,
   setConfig: (config) => set(config),
 }))
 
