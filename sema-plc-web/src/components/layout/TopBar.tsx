@@ -49,6 +49,17 @@ export function TopBar() {
   const [keyChecking, setKeyChecking] = useState(false)                                  // 校验请求进行中
   const [keyError, setKeyError] = useState<{ message?: string; curl?: string } | null>(null)  // 校验失败原因
   const [curlCopied, setCurlCopied] = useState(false)                                    // curl 复制反馈
+  // 拖拽排序(纯前端,localStorage 持久化)
+  const [savedVendorOrder, setSavedVendorOrder] = useState<string[] | null>(() => {
+    try { return JSON.parse(localStorage.getItem('semaplc:vendor-order') ?? 'null') } catch { return null }
+  })
+  const [savedModelOrder, setSavedModelOrder] = useState<Record<string, string[]>>(() => {
+    try { return JSON.parse(localStorage.getItem('semaplc:model-order') ?? '{}') ?? {} } catch { return {} }
+  })
+  const [dragVendor, setDragVendor] = useState<string | null>(null)
+  const [dragOverVendor, setDragOverVendor] = useState<string | null>(null)
+  const [dragModel, setDragModel] = useState<string | null>(null)
+  const [dragOverModel, setDragOverModel] = useState<string | null>(null)
 
   // 厂商分类:纯前端按 key 前缀派生(后端 provider 字段是适配器类型,不是厂商)
   const vendorOf = (key: string): string => {
@@ -81,6 +92,28 @@ export function TopBar() {
     openrouter: { zh: 'OpenRouter', en: 'OpenRouter' },
     kimi: { zh: 'Kimi', en: 'Kimi' },
     gemini: { zh: 'Gemini', en: 'Gemini' },
+  }
+
+  const reorderVendors = (currentOrder: string[], from: string, to: string) => {
+    const arr = [...currentOrder]
+    const fi = arr.indexOf(from)
+    const ti = arr.indexOf(to)
+    if (fi < 0 || ti < 0 || fi === ti) return
+    arr.splice(fi, 1)
+    arr.splice(ti, 0, from)
+    setSavedVendorOrder(arr)
+    localStorage.setItem('semaplc:vendor-order', JSON.stringify(arr))
+  }
+  const reorderModels = (vendor: string, currentKeys: string[], fromKey: string, toKey: string) => {
+    const arr = [...currentKeys]
+    const fi = arr.indexOf(fromKey)
+    const ti = arr.indexOf(toKey)
+    if (fi < 0 || ti < 0 || fi === ti) return
+    arr.splice(fi, 1)
+    arr.splice(ti, 0, fromKey)
+    const next = { ...savedModelOrder, [vendor]: arr }
+    setSavedModelOrder(next)
+    localStorage.setItem('semaplc:model-order', JSON.stringify(next))
   }
 
   const submitSwitch = () => {
@@ -182,20 +215,31 @@ export function TopBar() {
               // 自定义模型(key 以 'custom' 开头)不进厂商分组,单独在「自定义」页管理。
               const customModels = modelOptions.filter((o) => o.key.startsWith('custom'))
               // 按厂商分组,保持 modelOptions 原始顺序内的首次出现顺序
-              const order: string[] = []
+              const rawOrder: string[] = []
               const groups: Record<string, typeof modelOptions> = {}
               for (const o of modelOptions) {
                 if (o.key.startsWith('custom')) continue
                 const v = vendorOf(o.key)
-                if (!groups[v]) { groups[v] = []; order.push(v) }
+                if (!groups[v]) { groups[v] = []; rawOrder.push(v) }
                 groups[v].push(o)
               }
+              if (customModels.length > 0) rawOrder.push('custom')
+              const order = savedVendorOrder
+                ? [...rawOrder].sort((a, b) => {
+                    const ia = savedVendorOrder.indexOf(a)
+                    const ib = savedVendorOrder.indexOf(b)
+                    if (ia < 0 && ib < 0) return 0
+                    if (ia < 0) return 1
+                    if (ib < 0) return -1
+                    return ia - ib
+                  })
+                : rawOrder
               // 当前选中模型所属"厂商"(自定义模型归到 'custom' 页)
               const selVendor = modelSelected ? (modelSelected.startsWith('custom') ? 'custom' : vendorOf(modelSelected)) : null
               // 'custom' = 已添加的自定义模型列表;'custom-add' = 添加表单。两者在左栏是独立入口。
-              const activeVendor = vendorSel && (vendorSel === 'custom' || vendorSel === 'custom-add' || groups[vendorSel])
+              const activeVendor = vendorSel && (vendorSel === 'custom-add' || order.includes(vendorSel))
                 ? vendorSel
-                : (selVendor ?? order.find((v) => groups[v].some((o) => o.configured)) ?? order[0])
+                : (selVendor ?? order.find((v) => v !== 'custom' && groups[v]?.some((o) => o.configured)) ?? order[0])
               const submitCustom = () => {
                 if (!customBaseURL.trim() || !customModelName.trim() || !customKey.trim()) return
                 send({
@@ -208,19 +252,39 @@ export function TopBar() {
                 // 加完清空表单、跳回自定义列表页(切换由后端完成,列表会刷新出新的当前项)
                 setCustomBaseURL(''); setCustomModelName(''); setCustomKey(''); setVendorSel('custom')
               }
-              const vendorModels = groups[activeVendor] ?? []
+              const vendorModelsSrc = groups[activeVendor] ?? []
+              const smOrder = savedModelOrder[activeVendor]
+              const vendorModels = smOrder
+                ? [...vendorModelsSrc].sort((a, b) => {
+                    const ia = smOrder.indexOf(a.key)
+                    const ib = smOrder.indexOf(b.key)
+                    if (ia < 0 && ib < 0) return 0
+                    if (ia < 0) return 1
+                    if (ib < 0) return -1
+                    return ia - ib
+                  })
+                : vendorModelsSrc
+              const modelDragProps = (key: string) => ({
+                draggable: wsStatus === 'open',
+                onDragStart: (e: React.DragEvent) => { e.dataTransfer.effectAllowed = 'move' as const; setDragModel(key) },
+                onDragOver: (e: React.DragEvent) => { e.preventDefault(); setDragOverModel(key) },
+                onDrop: (e: React.DragEvent) => { e.preventDefault(); if (dragModel) reorderModels(activeVendor, vendorModels.map((m) => m.key), dragModel, key); setDragModel(null); setDragOverModel(null) },
+                onDragEnd: () => { setDragModel(null); setDragOverModel(null) },
+                onDragLeave: () => setDragOverModel(null),
+              })
+              const dragCls = (key: string) => (dragModel === key ? ' dragging' : '') + (dragOverModel === key && dragModel !== key ? ' drag-over' : '')
               const renderModelRow = (opt: typeof modelOptions[number]) => {
                 const active = opt.key === modelSelected
-                // 未配置:整行可点 → 打开填 key 弹窗(不是切换)。填完徽标翻为已配置,行才变可切换。
                 if (!opt.configured) {
                   return (
                     <button
                       key={opt.key}
                       type="button"
-                      className="model-row disabled needs-key"
+                      className={'model-row disabled needs-key' + dragCls(opt.key)}
                       disabled={wsStatus !== 'open'}
                       title={opt.envHint ? (lang === 'zh' ? `点击填入 ${opt.envHint}` : `Click to set ${opt.envHint}`) : undefined}
                       onClick={() => openKeyModal(opt.key)}
+                      {...modelDragProps(opt.key)}
                     >
                       <span className="model-row-main">
                         <span className="model-row-title">{opt.modelName}</span>
@@ -229,19 +293,18 @@ export function TopBar() {
                     </button>
                   )
                 }
-                const disabled = wsStatus !== 'open' || active
                 return (
                   <button
                     key={opt.key}
                     type="button"
-                    className={'model-row' + (active ? ' active' : '')}
-                    disabled={disabled}
+                    className={'model-row' + (active ? ' active' : '') + dragCls(opt.key)}
+                    disabled={wsStatus !== 'open'}
                     onClick={() => {
-                      // 切模型只影响后续 Agent 请求(后端仅 applyTaskModel,不重建会话),
-                      // 不动当前对话/代码/运行中的 PLC,故直接切,无需二次确认。
+                      if (active) return
                       send({ type: 'model:switch', key: opt.key })
                       setModelOpen(false)
                     }}
+                    {...modelDragProps(opt.key)}
                   >
                     <span className="model-row-main">
                       <span className="model-row-title">{opt.modelName}</span>
@@ -252,36 +315,48 @@ export function TopBar() {
                   </button>
                 )
               }
+              const csOrder = savedModelOrder['custom']
+              const sortedCustom = csOrder
+                ? [...customModels].sort((a, b) => {
+                    const ia = csOrder.indexOf(a.key)
+                    const ib = csOrder.indexOf(b.key)
+                    if (ia < 0 && ib < 0) return 0
+                    if (ia < 0) return 1
+                    if (ib < 0) return -1
+                    return ia - ib
+                  })
+                : customModels
               return (
                 <div className="model-cols">
                   <div className="model-vendors">
                     {order.map((v) => {
-                      const list = groups[v]
-                      const hasReady = list.some((o) => o.configured)
+                      const isCustom = v === 'custom'
+                      const list = isCustom ? customModels : groups[v]
+                      const hasReady = isCustom ? customModels.length > 0 : list.some((o) => o.configured)
                       const isActiveVendor = v === activeVendor
                       const isCurrentVendor = selVendor === v
+                      const vendorDragProps = {
+                        draggable: true as const,
+                        onDragStart: (e: React.DragEvent) => { e.dataTransfer.effectAllowed = 'move' as const; setDragVendor(v) },
+                        onDragOver: (e: React.DragEvent) => { e.preventDefault(); setDragOverVendor(v) },
+                        onDrop: (e: React.DragEvent) => { e.preventDefault(); if (dragVendor) reorderVendors(order, dragVendor, v); setDragVendor(null); setDragOverVendor(null) },
+                        onDragEnd: () => { setDragVendor(null); setDragOverVendor(null) },
+                        onDragLeave: () => setDragOverVendor(null),
+                      }
                       return (
                         <button
                           key={v}
                           type="button"
-                          className={'model-vendor' + (isActiveVendor ? ' active' : '') + (!hasReady ? ' dim' : '')}
+                          className={'model-vendor' + (isCustom ? ' custom' : '') + (isActiveVendor ? ' active' : '') + (!hasReady ? ' dim' : '') + (dragVendor === v ? ' dragging' : '') + (dragOverVendor === v && dragVendor !== v ? ' drag-over' : '')}
                           onClick={() => setVendorSel(v)}
+                          {...vendorDragProps}
                         >
-                          <span className="model-vendor-name">{lang === 'zh' ? VENDOR_LABELS[v]?.zh : VENDOR_LABELS[v]?.en ?? v}</span>
+                          <span className="model-vendor-name">{isCustom ? (lang === 'zh' ? '⚙ 自定义' : '⚙ Custom') : (lang === 'zh' ? VENDOR_LABELS[v]?.zh : VENDOR_LABELS[v]?.en ?? v)}</span>
                           <span className="model-vendor-count">{list.length}</span>
                           {isCurrentVendor && <span className="model-vendor-dot" />}
                         </button>
                       )
                     })}
-                    <button
-                      type="button"
-                      className={'model-vendor custom' + (activeVendor === 'custom' ? ' active' : '')}
-                      onClick={() => setVendorSel('custom')}
-                    >
-                      <span className="model-vendor-name">{lang === 'zh' ? '⚙ 自定义' : '⚙ Custom'}</span>
-                      <span className="model-vendor-count">{customModels.length}</span>
-                      {selVendor === 'custom' && <span className="model-vendor-dot" />}
-                    </button>
                     <button
                       type="button"
                       className={'model-vendor custom-add' + (activeVendor === 'custom-add' ? ' active' : '')}
@@ -296,13 +371,22 @@ export function TopBar() {
                         {/* 「自定义」页只列已添加的自定义模型;添加入口在左栏「＋ 添加自定义」,互不混放。 */}
                         {customModels.length === 0 ? (
                           <div className="model-custom-empty">
-                            {lang === 'zh' ? '暂无自定义模型,点左侧「＋ 添加自定义」新建。' : 'No custom models yet — use “＋ Add custom” on the left.'}
+                            {lang === 'zh' ? '暂无自定义模型,点左侧「＋ 添加自定义」新建。' : 'No custom models yet — use "＋ Add custom" on the left.'}
                           </div>
-                        ) : customModels.map((opt) => {
+                        ) : sortedCustom.map((opt) => {
                           const active = opt.key === modelSelected
                           const confirming = confirmDelId === opt.key
                           return (
-                            <div key={opt.key} className={'model-crow' + (active ? ' active' : '')}>
+                            <div
+                              key={opt.key}
+                              draggable={wsStatus === 'open'}
+                              className={'model-crow' + (active ? ' active' : '') + (dragModel === opt.key ? ' dragging' : '') + (dragOverModel === opt.key && dragModel !== opt.key ? ' drag-over' : '')}
+                              onDragStart={(e) => { e.dataTransfer.effectAllowed = 'move'; setDragModel(opt.key) }}
+                              onDragOver={(e) => { e.preventDefault(); setDragOverModel(opt.key) }}
+                              onDrop={(e) => { e.preventDefault(); if (dragModel) reorderModels('custom', sortedCustom.map((m) => m.key), dragModel, opt.key); setDragModel(null); setDragOverModel(null) }}
+                              onDragEnd={() => { setDragModel(null); setDragOverModel(null) }}
+                              onDragLeave={() => setDragOverModel(null)}
+                            >
                               <button
                                 type="button"
                                 className="model-crow-hit"
