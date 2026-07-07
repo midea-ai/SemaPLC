@@ -2,7 +2,8 @@ import { create } from 'zustand'
 import type { ModelConfigState } from '../../shared/protocol'
 import type { WsClient } from '../ws/client'
 
-interface ModelStore extends ModelConfigState {
+interface ModelStore extends Omit<ModelConfigState, 'thinking'> {
+  thinking: boolean | null
   setConfig: (config: ModelConfigState) => void
 }
 
@@ -10,6 +11,7 @@ export const useModelStore = create<ModelStore>((set) => ({
   selected: null,
   active: null,
   options: [],
+  thinking: null as boolean | null,
   setConfig: (config) => set(config),
 }))
 

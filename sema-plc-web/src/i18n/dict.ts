@@ -42,6 +42,9 @@ const zh = {
   'chat.input.placeholder.connecting': '连接后端中…',
   'chat.input.placeholder.offline': '后端离线(将自动重连)',
   'chat.send': '发送',
+  'chat.thinking.label': '深度思考',
+  'chat.thinking.on': '深度思考已开启',
+  'chat.thinking.off': '深度思考已关闭',
   // ── canvas tabs ──
   'canvas.tab.process': '过程仿真',
   'canvas.tab.code': '代码',
@@ -205,6 +208,9 @@ const en: Record<TKey, string> = {
   'chat.input.placeholder.connecting': 'Connecting to backend…',
   'chat.input.placeholder.offline': 'Backend offline (will auto-reconnect)',
   'chat.send': 'Send',
+  'chat.thinking.label': 'Thinking',
+  'chat.thinking.on': 'Thinking enabled',
+  'chat.thinking.off': 'Thinking disabled',
   // ── canvas tabs ──
   'canvas.tab.process': 'Process Simulation',
   'canvas.tab.code': 'Code',

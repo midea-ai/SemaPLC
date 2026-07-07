@@ -7,7 +7,7 @@ import { validateSceneSpec } from '../../sema-plc-tools/dist/tools/sceneSpec.js'
 import * as fs from 'fs'
 import * as path from 'path'
 import { safePath } from './pathSafety.js'
-import { currentModelConfigState, resolveModel, setRuntimeModelKey, VERIFIED_MODEL_KEYS, envKeyForModel, buildModelRegistry } from './model-registry.js'
+import { currentModelConfigState, resolveModel, setRuntimeModelKey, getRuntimeThinking, setRuntimeThinking, VERIFIED_MODEL_KEYS, envKeyForModel, buildModelRegistry } from './model-registry.js'
 import { addCustomModel, deleteCustomModel, getCustomModel } from './custom-models.js'
 import { saveKeyOverride } from './key-overrides.js'
 
@@ -64,7 +64,7 @@ export class SemaBridge {
       // 块协议消费 message:thinking:chunk；DeepSeek(openai adapter reasoning_content)/MiniMax(anthropic adapter) 逐 provider 实测。
       // 默认开(保留对话页思考块);PLC_THINKING=0 关闭——思考会烧掉输出 token 预算,撞 maxTokens 触发截断红框时可关闭对比。
       // SemaCore 构造期读取,start() 在 resetSession/switchWorkspace 都会重建 core,故改 env 重启即生效。
-      thinking: process.env.PLC_THINKING !== '0',
+      thinking: getRuntimeThinking(),
       stream: true,
       disableTopicDetection: true,
       disableBackgroundTasks: true,
@@ -342,6 +342,17 @@ export class SemaBridge {
           setRuntimeModelKey(before)
           this.emitModelConfig()
           bus.emit({ type: 'error', message: `model switch failed: ${e instanceof Error ? e.message : String(e)}` })
+        }
+        break
+      }
+      case 'internal:set-thinking': {
+        try {
+          if (!this.core) return
+          this.core.updateCoreConfig({ thinking: m.enabled })
+          setRuntimeThinking(m.enabled)
+          this.emitModelConfig()
+        } catch (e) {
+          bus.emit({ type: 'error', message: `set thinking failed: ${e instanceof Error ? e.message : String(e)}` })
         }
         break
       }

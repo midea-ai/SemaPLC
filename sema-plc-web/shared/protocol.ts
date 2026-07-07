@@ -66,6 +66,7 @@ export interface ModelConfigState {
   selected: string | null
   active: { key: string; id: string; provider: string; modelName: string } | null
   options: ModelOption[]
+  thinking: boolean
 }
 
 // ── Scene Spec (process simulation) — mirrors plc-tools src/tools/sceneSpec.ts ──
@@ -134,6 +135,8 @@ export type ClientMessage =
   // key 是模型选项 key(如 'deepseek'),后端据此定位对应的 *_API_KEY 环境变量名。
   // 默认先探针校验链路、通过才保存;force=true 时跳过探针直接保存(校验误报时用户越过)。
   | { type: 'model:set-key'; key: string; apiKey: string; force?: boolean }
+  // 思考模式开关（运行时无损切换：bridge 调 sema-core setCoreConfig，不重建 core、不丢对话）。
+  | { type: 'model:set-thinking'; enabled: boolean }
 
 // ─────────────────────────── Server → Client ───────────────────────────
 export type ServerMessage =

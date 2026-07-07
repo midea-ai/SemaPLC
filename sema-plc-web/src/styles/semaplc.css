@@ -65,6 +65,7 @@
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .model-pop-current-key{flex:none;font-size:10.5px;font-weight:600;color:var(--text-2);
   background:#EEF0F3;border-radius:5px;padding:2px 6px;white-space:nowrap;}
+.model-pop-thinking{flex:none;font-size:10px;color:var(--text-3);white-space:nowrap;}
 .model-pop-close{flex:none;width:26px;height:26px;border:none;border-radius:7px;background:transparent;
   color:var(--text-3);font-size:17px;line-height:1;display:flex;align-items:center;justify-content:center;
   cursor:pointer;transition:.14s;}
@@ -108,6 +109,11 @@
 .model-row-led{width:5px;height:5px;border-radius:50%;background:#fff;flex:none;}
 .model-row.disabled .model-row-title{color:var(--text-3);}
 .model-row.disabled .model-row-sub{color:#C2C7D0;}
+/* 拖拽排序 */
+.model-vendor[draggable],.model-row[draggable],.model-crow[draggable]{cursor:grab;}
+.model-vendor[draggable]:active:not(.dragging),.model-row[draggable]:active:not(.dragging),.model-crow[draggable]:active:not(.dragging){cursor:grabbing;}
+.model-vendor.dragging,.model-row.dragging,.model-crow.dragging{opacity:.35;}
+.model-vendor.drag-over,.model-row.drag-over,.model-crow.drag-over{box-shadow:inset 0 -2px 0 var(--brand);}
 .model-pop-note{border-top:1px solid var(--line);padding:11px 15px;font-size:11px;line-height:1.55;
   color:var(--text-3);background:#FBFBFC;}
 /* 未配置行:仍点亮为可点(填 key),徽标示意可操作 */
@@ -265,7 +271,9 @@
 @keyframes typing{0%,60%,100%{transform:translateY(0);opacity:.4;}30%{transform:translateY(-4px);opacity:1;}}
 
 /* 对话输入 */
-.chat-input{display:flex;align-items:flex-end;gap:9px;padding:12px 14px;border-top:1px solid var(--line);}
+.chat-input-wrap{border-top:1px solid var(--line);}
+.chat-input-bar{display:flex;align-items:center;gap:6px;padding:6px 14px 0;}
+.chat-input{display:flex;align-items:flex-end;gap:9px;padding:8px 14px 12px;}
 .chat-input textarea{flex:1;resize:none;border:1px solid var(--line);border-radius:11px;padding:10px 12px;
   font-size:13.5px;font-family:inherit;line-height:1.5;max-height:120px;color:var(--text-1);background:#FBFBFC;outline:none;}
 .chat-input textarea:focus{border-color:var(--brand);background:#fff;}
@@ -273,6 +281,11 @@
   display:flex;align-items:center;justify-content:center;transition:.15s;border:none;}
 .send-btn:hover:not(:disabled){filter:brightness(1.08);}
 .send-btn:disabled{opacity:.4;cursor:default;}
+.thinking-toggle{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:14px;
+  border:1px solid var(--line);background:transparent;color:var(--text-2);font-size:12px;cursor:pointer;transition:.15s;}
+.thinking-toggle:hover:not(:disabled){border-color:var(--text-2);}
+.thinking-toggle.on{border-color:var(--brand);color:var(--brand);background:color-mix(in srgb,var(--brand) 8%,transparent);}
+.thinking-toggle:disabled{opacity:.4;cursor:default;}
 
 /* 空态对话 */
 .empty-chat{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;

@@ -8,6 +8,9 @@ description: 把 ST 代码完整跑通并验证行为：写 .st 到 src/programs
 ## 起手先看模式库(省一半迭代)
 
 复杂控制逻辑从零手写容易反复栽(移位寄存器 off-by-one、状态机相位边界、PID 缺 plant)。**本 skill 目录下** `st-patterns/` 有**已验证编译通过的可改写骨架**(路径相对本 skill 的 base path),遇到对应拓扑**先 `view_file` 对应模板,改名字/数量/阈值**,别从零写:
+- `./st-patterns/latch_priority.st` — 输入驱动锁存 + 优先级覆盖(电机启停/阀门启停)。一行 RS 锁存,急停天然最高优先。
+- `./st-patterns/edge_counter.st` — R_TRIG 边沿计数 + 下限钳位 + 阈值比较输出(停车场/产线计数/批次)。
+- `./st-patterns/bangbang_plant.st` — 双位(bang-bang)回差控制 + 自驱 plant(水箱液位/温控开关)。
 - `./st-patterns/state_machine_timed.st` — N 状态机 + TON 定时器(红绿灯/顺序动作)。自驱循环。
 - `./st-patterns/pid_level_with_plant.st` — 连续量闭环 + **内部 plant 自驱**(液位/温度/PID)。**反馈量必须是程序自驱的内部量/输出,不能是 %IW 输入**(否则 buildSimulation 的 plant 硬门会拒、实时仿真死图)。
 - `./st-patterns/conveyor_shift_register.st` — 传送带工件追踪 + 移位寄存器分拣(最难)。工件位置自驱量 + 验持久后果。

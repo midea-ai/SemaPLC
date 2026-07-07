@@ -254,7 +254,7 @@ describe('SimRuntime 坏 scene 防御(防白屏)', () => {
   it('canvas 缺失 → 不抛,用默认尺寸渲染', () => {
     useSimStore.getState().setScene({ version: '1', parts: [] } as any)
     const { container } = render(<SimRuntime />)
-    expect(container.querySelector('svg')!.getAttribute('width')).toBe('600')
+    expect(container.querySelector('svg')!.style.width).toBe('600px')
   })
 })
 

@@ -107,6 +107,9 @@ export class WsGateway {
       case 'model:set-key':
         bus.emit({ type: 'internal:set-key', key: m.key, apiKey: m.apiKey, force: m.force })
         break
+      case 'model:set-thinking':
+        bus.emit({ type: 'internal:set-thinking', enabled: m.enabled })
+        break
       case 'editor:save':
         bus.emit({ type: 'internal:editor-save', path: m.path, stCode: m.stCode })
         break

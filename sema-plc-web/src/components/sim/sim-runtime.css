@@ -2,7 +2,7 @@
 .sim-bar { display: flex; align-items: center; gap: 10px; padding: 8px 14px; border-bottom: 1px solid var(--line, #e5e7eb); font-size: 13px; color: var(--text-2, #4b5563); }
 .sim-live { color: var(--brand, #10B981); font-weight: 600; }
 .sim-spacer { flex: 1; }
-.sim-stage { padding: 18px; }
+.sim-stage { flex: 1; display: flex; align-items: center; justify-content: center; padding: 18px; min-height: 0; }
 .sim-label { font: 11px/1.2 monospace; fill: #384150; }
 
 /* conveyor belt scroll + motor spin: only when the 'sim-run' class is added by a class effect */

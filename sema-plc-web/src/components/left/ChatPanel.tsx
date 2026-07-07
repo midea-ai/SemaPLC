@@ -1,6 +1,7 @@
 import { memo, useEffect, useRef, useState } from 'react'
 import type { KeyboardEvent as ReactKeyboardEvent } from 'react'
 import { useAgentStore, type ChatMessage } from '../../store/agent'
+import { useModelStore } from '../../store/model'
 import { useWsConnection } from '../../ws/useWsConnection'
 import { useT, useLang } from '../../i18n'
 import { scenarios } from '../../i18n/scenarios'
@@ -94,6 +95,8 @@ export function ChatPanel() {
   const scrollRef = useRef<HTMLDivElement>(null)
   const pinnedRef = useRef(true)
   const composingRef = useRef(false)
+  const thinking = useModelStore((s) => s.thinking)
+  const toggleThinking = () => send({ type: 'model:set-thinking', enabled: !thinking })
   useEffect(() => {
     if (pinnedRef.current) scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight })
   }, [messages])  // zustand 每次更新都换 messages 引用 → 每个 delta 触发
@@ -171,22 +174,39 @@ export function ChatPanel() {
         </div>
       )}
 
-      <div className="chat-input">
-        <textarea
-          rows={1}
-          placeholder={status === 'open' ? (agentState === 'processing' ? t('chat.input.placeholder.processing') : t('chat.input.placeholder.ready')) : status === 'connecting' ? t('chat.input.placeholder.connecting') : t('chat.input.placeholder.offline')}
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onCompositionStart={() => { composingRef.current = true }}
-          onCompositionEnd={() => {
-            setTimeout(() => { composingRef.current = false }, 0)
-          }}
-          onKeyDown={(e) => { if (shouldSubmitOnEnter(e, composingRef.current)) { e.preventDefault(); if (!sendDisabled) submit() } }}
-          disabled={inputDisabled}
-        />
-        <button className="send-btn" onClick={() => submit()} disabled={sendDisabled} title={t('chat.send')}>
-          <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 8h11M9 4l4 4-4 4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" /></svg>
-        </button>
+      <div className="chat-input-wrap">
+        <div className="chat-input-bar">
+          <button
+            type="button"
+            className={'thinking-toggle' + (thinking ? ' on' : '')}
+            onClick={toggleThinking}
+            disabled={inputDisabled}
+            title={thinking ? t('chat.thinking.on') : t('chat.thinking.off')}
+          >
+            <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true">
+              <path d="M8 1a5.5 5.5 0 0 0-2 10.63V13a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1v-1.37A5.5 5.5 0 0 0 8 1Z" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
+              <path d="M6 15h4" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+            </svg>
+            <span>{t('chat.thinking.label')}</span>
+          </button>
+        </div>
+        <div className="chat-input">
+          <textarea
+            rows={1}
+            placeholder={status === 'open' ? (agentState === 'processing' ? t('chat.input.placeholder.processing') : t('chat.input.placeholder.ready')) : status === 'connecting' ? t('chat.input.placeholder.connecting') : t('chat.input.placeholder.offline')}
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onCompositionStart={() => { composingRef.current = true }}
+            onCompositionEnd={() => {
+              setTimeout(() => { composingRef.current = false }, 0)
+            }}
+            onKeyDown={(e) => { if (shouldSubmitOnEnter(e, composingRef.current)) { e.preventDefault(); if (!sendDisabled) submit() } }}
+            disabled={inputDisabled}
+          />
+          <button className="send-btn" onClick={() => submit()} disabled={sendDisabled} title={t('chat.send')}>
+            <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 8h11M9 4l4 4-4 4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" /></svg>
+          </button>
+        </div>
       </div>
     </section>
   )

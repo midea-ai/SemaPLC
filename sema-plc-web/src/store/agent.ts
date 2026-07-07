@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { persist, createJSONStorage } from 'zustand/middleware'
 import type { WsClient } from '../ws/client'
 import type { TodoItem, AgentBlock, SerializedTurn, ServerMessage, ToolBlockResult } from '../../shared/protocol'
 
@@ -32,18 +33,54 @@ function updateBlock(blocks: AgentBlock[], blockId: string, fn: (b: AgentBlock) 
   return blocks.map((b) => (b.id === blockId ? fn(b) : b))
 }
 
-export const useAgentStore = create<AgentStore>((set) => ({
-  messages: [],
-  state: 'idle',
-  todos: [],
-  sessionId: null,
-  setTodos: (todos) => set({ todos }),
-  appendUser: (text) => set((s) => ({
-    messages: [...s.messages, { id: `u-${Date.now()}`, kind: 'user', text, ts: Date.now() }],
-  })),
-  setState: (state) => set({ state }),
-  clear: () => set({ messages: [], state: 'idle', todos: [], sessionId: null }),
-}))
+// ponytail: 聊天历史只存内存,刷新即丢。persist 到 localStorage 让刷新能恢复最近历史。
+// 只持久化 messages + sessionId:state/todos 是瞬时态,由后端 sticky(workspace:ready /
+// agent:state / agent:todos)重放;sessionId 复用 workspace:ready 的比对,server 重启
+// (sessionId 变)自动清空,纯刷新(sessionId 同)自动恢复。仍 streaming 的进行中 turn 不
+// 持久化——那些由后端 turn-snapshot 在重连时恢复,避免刷新后卡死在 streaming 状态。
+// 浏览器外的环境（如 node 测试）没有 localStorage → 退化为内存 noop，避免 persist 崩。
+const noopStorage = { getItem: () => null, setItem: () => {}, removeItem: () => {} }
+// ponytail: 流式输出每个 delta 都触发 persist，throttle 避免主线程压力
+function throttledStorage(base: Storage) {
+  let timer: ReturnType<typeof setTimeout> | null = null
+  let pending: [string, string] | null = null
+  return {
+    getItem: (k: string) => base.getItem(k),
+    setItem: (k: string, v: string) => {
+      pending = [k, v]
+      if (!timer) timer = setTimeout(() => { if (pending) base.setItem(pending[0], pending[1]); pending = null; timer = null }, 300)
+    },
+    removeItem: (k: string) => base.removeItem(k),
+  }
+}
+const MAX_HISTORY = 60
+export const useAgentStore = create<AgentStore>()(
+  persist(
+    (set) => ({
+      messages: [],
+      state: 'idle',
+      todos: [],
+      sessionId: null,
+      setTodos: (todos) => set({ todos }),
+      appendUser: (text) => set((s) => ({
+        messages: [...s.messages, { id: `u-${Date.now()}`, kind: 'user', text, ts: Date.now() }],
+      })),
+      setState: (state) => set({ state }),
+      clear: () => set({ messages: [], state: 'idle', todos: [], sessionId: null }),
+    }),
+    {
+      name: 'semaplc:agent-chat',
+      storage: createJSONStorage(() => (typeof localStorage !== 'undefined' ? throttledStorage(localStorage) : noopStorage)),
+      partialize: (s) => ({
+        sessionId: s.sessionId,
+        messages: s.messages
+          .filter((m) => !(m.kind === 'agent' && m.status === 'streaming')
+                      && !(m.kind === 'manual-tool' && m.status === 'running'))
+          .slice(-MAX_HISTORY),
+      }),
+    },
+  ),
+)
 
 /** WS 事件 → store。导出供测试直接驱动（不经 WsClient）。 */
 export function handleAgentWsMessage(m: ServerMessage): void {
