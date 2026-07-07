@@ -1,4 +1,8 @@
-import type { VerifyPlan } from './plan-types'
+import type { VerifyPlan, Scalar } from '../../../sema-plc-tools/src/verify/planTypes'
+
+const MOTOR_RUN: Record<string, Scalar> = { start_btn: true, stop_btn: false, estop: false }
+const MOTOR_STOP: Record<string, Scalar> = { start_btn: false, stop_btn: false, estop: false }
+const PULSE2 = 2
 
 export const scenarioPlans: Record<string, VerifyPlan> = {
 
@@ -11,7 +15,7 @@ export const scenarioPlans: Record<string, VerifyPlan> = {
         name: '初始空闲态→电机停+灯灭',
         type: 'steady',
         resetBefore: true,
-        set: { start_btn: false, stop_btn: false, estop: false },
+        set: MOTOR_STOP,
         settleMs: 300,
         expect: [
           { var: 'motor', op: '==', value: false },
@@ -21,7 +25,7 @@ export const scenarioPlans: Record<string, VerifyPlan> = {
       {
         name: '按下启动→电机运转+指示灯亮',
         type: 'steady',
-        set: { start_btn: true, stop_btn: false, estop: false },
+        set: MOTOR_RUN,
         settleMs: 500,
         expect: [
           { var: 'motor', op: '==', value: true },
@@ -34,8 +38,8 @@ export const scenarioPlans: Record<string, VerifyPlan> = {
         resetBefore: true,
         steps: [
           {
-            set: { start_btn: true, stop_btn: false, estop: false },
-            pulseScans: 2,
+            set: MOTOR_RUN,
+            pulseScans: PULSE2,
           },
           {
             settleMs: 500,
@@ -52,7 +56,7 @@ export const scenarioPlans: Record<string, VerifyPlan> = {
         resetBefore: true,
         steps: [
           {
-            set: { start_btn: true, stop_btn: false, estop: false },
+            set: MOTOR_RUN,
             waitFor: { var: 'motor', op: '==', value: true, timeoutMs: 3000 },
           },
           {
@@ -71,7 +75,7 @@ export const scenarioPlans: Record<string, VerifyPlan> = {
         resetBefore: true,
         steps: [
           {
-            set: { start_btn: true, stop_btn: false, estop: false },
+            set: MOTOR_RUN,
             waitFor: { var: 'motor', op: '==', value: true, timeoutMs: 3000 },
           },
           {
@@ -90,7 +94,7 @@ export const scenarioPlans: Record<string, VerifyPlan> = {
         resetBefore: true,
         steps: [
           {
-            set: { start_btn: true, stop_btn: false, estop: false },
+            set: MOTOR_RUN,
             waitFor: { var: 'motor', op: '==', value: true, timeoutMs: 3000 },
           },
           {
@@ -98,7 +102,7 @@ export const scenarioPlans: Record<string, VerifyPlan> = {
             waitFor: { var: 'motor', op: '==', value: false, timeoutMs: 3000 },
           },
           {
-            set: { start_btn: true, stop_btn: false, estop: false },
+            set: MOTOR_RUN,
             settleMs: 500,
             expect: [
               { var: 'motor', op: '==', value: true },
@@ -113,7 +117,7 @@ export const scenarioPlans: Record<string, VerifyPlan> = {
         resetBefore: true,
         steps: [
           {
-            set: { start_btn: true, stop_btn: false, estop: false },
+            set: MOTOR_RUN,
             waitFor: { var: 'motor', op: '==', value: true, timeoutMs: 3000 },
           },
           {
@@ -121,7 +125,7 @@ export const scenarioPlans: Record<string, VerifyPlan> = {
             waitFor: { var: 'motor', op: '==', value: false, timeoutMs: 3000 },
           },
           {
-            set: { start_btn: true, stop_btn: false, estop: false },
+            set: MOTOR_RUN,
             settleMs: 500,
             expect: [
               { var: 'motor', op: '==', value: true },
@@ -227,7 +231,7 @@ export const scenarioPlans: Record<string, VerifyPlan> = {
         steps: [
           {
             set: { belt_run: true, color_sensor: true },
-            pulseScans: 2,
+            pulseScans: PULSE2,
           },
           {
             waitFor: { var: 'pusher', op: '==', value: true, timeoutMs: 10000 },
@@ -256,7 +260,7 @@ export const scenarioPlans: Record<string, VerifyPlan> = {
         steps: [
           {
             set: { belt_run: true, color_sensor: true },
-            pulseScans: 2,
+            pulseScans: PULSE2,
           },
           {
             waitFor: { var: 'pusher', op: '==', value: true, timeoutMs: 10000 },
@@ -276,7 +280,7 @@ export const scenarioPlans: Record<string, VerifyPlan> = {
         steps: [
           {
             set: { belt_run: true, color_sensor: true },
-            pulseScans: 2,
+            pulseScans: PULSE2,
           },
           {
             waitFor: { var: 'wp_pos', op: '>=', value: 900, timeoutMs: 15000 },
@@ -296,7 +300,7 @@ export const scenarioPlans: Record<string, VerifyPlan> = {
         steps: [
           {
             set: { belt_run: true, color_sensor: true },
-            pulseScans: 2,
+            pulseScans: PULSE2,
           },
           {
             waitFor: { var: 'sort_count', op: '>=', value: 1, timeoutMs: 12000 },
@@ -306,7 +310,7 @@ export const scenarioPlans: Record<string, VerifyPlan> = {
           },
           {
             set: { belt_run: true, color_sensor: true },
-            pulseScans: 2,
+            pulseScans: PULSE2,
           },
           {
             waitFor: { var: 'sort_count', op: '>=', value: 2, timeoutMs: 12000 },
@@ -566,7 +570,7 @@ export const scenarioPlans: Record<string, VerifyPlan> = {
         steps: [
           {
             set: { call2: true },
-            pulseScans: 2,
+            pulseScans: PULSE2,
           },
           {
             waitFor: { var: 'motor_up', op: '==', value: true, timeoutMs: 3000 },
@@ -597,7 +601,7 @@ export const scenarioPlans: Record<string, VerifyPlan> = {
         steps: [
           {
             set: { call1: true },
-            pulseScans: 2,
+            pulseScans: PULSE2,
           },
           {
             waitFor: { var: 'current_floor', op: '==', value: 1, timeoutMs: 15000 },
@@ -621,7 +625,7 @@ export const scenarioPlans: Record<string, VerifyPlan> = {
         steps: [
           {
             set: { call2: true },
-            pulseScans: 2,
+            pulseScans: PULSE2,
             expect: [
               { var: 'call_light2', op: '==', value: true },
             ],
@@ -642,7 +646,7 @@ export const scenarioPlans: Record<string, VerifyPlan> = {
         steps: [
           {
             set: { call1: true },
-            pulseScans: 2,
+            pulseScans: PULSE2,
           },
           {
             waitFor: { var: 'door_state', op: '==', value: true, timeoutMs: 15000 },
@@ -662,11 +666,11 @@ export const scenarioPlans: Record<string, VerifyPlan> = {
         steps: [
           {
             set: { call2: true },
-            pulseScans: 2,
+            pulseScans: PULSE2,
           },
           {
             set: { call0: true },
-            pulseScans: 2,
+            pulseScans: PULSE2,
             expect: [
               { var: 'call_light0', op: '==', value: true },
             ],
@@ -699,7 +703,7 @@ export const scenarioPlans: Record<string, VerifyPlan> = {
         ],
       },
       {
-        name: '上下行电机互斥(不同时为true)',
+        name: '上下行电机均有动作',
         type: 'trace',
         vars: ['motor_up', 'motor_down'],
         durationMs: 8000,
@@ -708,6 +712,7 @@ export const scenarioPlans: Record<string, VerifyPlan> = {
           { var: 'motor_up', kind: 'changed' },
           { var: 'motor_down', kind: 'changed' },
         ],
+        // ponytail: 真正的互斥断言需要 ShapeExpect 新增 kind:'mutex'，当前只验证两个电机都动过
       },
     ],
   },
@@ -736,7 +741,7 @@ export const scenarioPlans: Record<string, VerifyPlan> = {
         steps: [
           {
             set: { entry_sensor: true },
-            pulseScans: 2,
+            pulseScans: PULSE2,
             settleMs: 500,
           },
           {
@@ -753,12 +758,12 @@ export const scenarioPlans: Record<string, VerifyPlan> = {
         steps: [
           {
             set: { entry_sensor: true },
-            pulseScans: 2,
+            pulseScans: PULSE2,
             settleMs: 300,
           },
           {
             set: { exit_sensor: true },
-            pulseScans: 2,
+            pulseScans: PULSE2,
             settleMs: 300,
           },
           {
@@ -775,12 +780,12 @@ export const scenarioPlans: Record<string, VerifyPlan> = {
         steps: [
           {
             set: { entry_sensor: true },
-            pulseScans: 2,
+            pulseScans: PULSE2,
             settleMs: 300,
           },
           {
             set: { entry_sensor: true },
-            pulseScans: 2,
+            pulseScans: PULSE2,
             settleMs: 300,
           },
           {
@@ -797,7 +802,7 @@ export const scenarioPlans: Record<string, VerifyPlan> = {
         steps: [
           {
             set: { exit_sensor: true },
-            pulseScans: 2,
+            pulseScans: PULSE2,
             settleMs: 300,
           },
           {
@@ -833,7 +838,7 @@ export const scenarioPlans: Record<string, VerifyPlan> = {
           },
           {
             set: { exit_sensor: true },
-            pulseScans: 2,
+            pulseScans: PULSE2,
             settleMs: 500,
           },
           {

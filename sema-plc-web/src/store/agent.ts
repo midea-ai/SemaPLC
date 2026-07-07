@@ -40,6 +40,19 @@ function updateBlock(blocks: AgentBlock[], blockId: string, fn: (b: AgentBlock) 
 // 持久化——那些由后端 turn-snapshot 在重连时恢复,避免刷新后卡死在 streaming 状态。
 // 浏览器外的环境（如 node 测试）没有 localStorage → 退化为内存 noop，避免 persist 崩。
 const noopStorage = { getItem: () => null, setItem: () => {}, removeItem: () => {} }
+// ponytail: 流式输出每个 delta 都触发 persist，throttle 避免主线程压力
+function throttledStorage(base: Storage) {
+  let timer: ReturnType<typeof setTimeout> | null = null
+  let pending: [string, string] | null = null
+  return {
+    getItem: (k: string) => base.getItem(k),
+    setItem: (k: string, v: string) => {
+      pending = [k, v]
+      if (!timer) timer = setTimeout(() => { if (pending) base.setItem(pending[0], pending[1]); pending = null; timer = null }, 300)
+    },
+    removeItem: (k: string) => base.removeItem(k),
+  }
+}
 const MAX_HISTORY = 60
 export const useAgentStore = create<AgentStore>()(
   persist(
@@ -57,11 +70,12 @@ export const useAgentStore = create<AgentStore>()(
     }),
     {
       name: 'semaplc:agent-chat',
-      storage: createJSONStorage(() => (typeof localStorage !== 'undefined' ? localStorage : noopStorage)),
+      storage: createJSONStorage(() => (typeof localStorage !== 'undefined' ? throttledStorage(localStorage) : noopStorage)),
       partialize: (s) => ({
         sessionId: s.sessionId,
         messages: s.messages
-          .filter((m) => !(m.kind === 'agent' && m.status === 'streaming'))
+          .filter((m) => !(m.kind === 'agent' && m.status === 'streaming')
+                      && !(m.kind === 'manual-tool' && m.status === 'running'))
           .slice(-MAX_HISTORY),
       }),
     },
