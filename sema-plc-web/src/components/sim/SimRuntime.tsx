@@ -256,7 +256,7 @@ export function SimRuntime() {
         <svg ref={svgRef}
              viewBox={`0 0 ${canvas.width} ${canvas.height}`}
              style={{ background: canvas.background ?? '#ffffff', border: '1px solid #e5e7eb', borderRadius: 8,
-                      width: canvas.width, height: canvas.height, maxWidth: '100%', maxHeight: '100%' }}>
+                      width: '100%', maxWidth: canvas.width, height: 'auto', maxHeight: '100%' }}>
           {parts.map((p) => (
             <Part key={p.id} part={p} pose={layout?.get(p.id) ?? null}
                   input={interactive ? inputVarOf(p) : null} />

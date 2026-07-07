@@ -73,6 +73,7 @@ export function CodeView() {
   const appendLog = useLogsStore((s) => s.append)
   const { send } = useWsConnection()
   const [checking, setChecking] = useState(false)
+  const [treeOpen, setTreeOpen] = useState(true)
 
   const tree = useMemo(() => buildTree(files.map((f) => f.path)), [files])
   const lang = currentPath ? langOf(currentPath) : 'st'
@@ -119,14 +120,26 @@ export function CodeView() {
 
   return (
     <div className="code-view2">
-      <div className="code-tree">
-        <div className="tree-head">{t('code.tree.head')}</div>
-        {files.length === 0
-          ? <div style={{ padding: '8px', fontSize: 12, color: 'var(--text-3)' }}>{t('code.tree.empty')}</div>
-          : <Tree node={tree} depth={-1} active={currentPath} onSelect={onSelectFile} />}
-      </div>
+      {treeOpen && (
+        <div className="code-tree">
+          <div className="tree-head">
+            {t('code.tree.head')}
+            <button className="tree-toggle" onClick={() => setTreeOpen(false)} title={t('code.tree.collapse')}>
+              <svg width="12" height="12" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" transform="rotate(90 8 8)" /></svg>
+            </button>
+          </div>
+          {files.length === 0
+            ? <div style={{ padding: '8px', fontSize: 12, color: 'var(--text-3)' }}>{t('code.tree.empty')}</div>
+            : <Tree node={tree} depth={-1} active={currentPath} onSelect={onSelectFile} />}
+        </div>
+      )}
       <div className="code-main">
         <div className="code-filebar">
+          {!treeOpen && (
+            <button className="tree-expand-btn" onClick={() => setTreeOpen(true)} title={t('code.tree.expand')}>
+              <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><path d="M1.5 3.5h4l1.2 1.4H14.5v8H1.5z" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" /></svg>
+            </button>
+          )}
           <span className="code-fname">{currentPath ?? t('code.filebar.noFile')}</span>
           <div className="code-meta">
             {currentPath && <span>{LANG_LABEL[lang]} · {t('code.meta.lineCount', { count: lineCount })}</span>}

@@ -83,7 +83,7 @@ export function shouldSubmitOnEnter(e: ReactKeyboardEvent<HTMLTextAreaElement>, 
   return e.key === 'Enter' && !e.shiftKey && !isComposing && !e.nativeEvent.isComposing && e.keyCode !== 229
 }
 
-export function ChatPanel() {
+export function ChatPanel({ onCollapse }: { onCollapse?: () => void } = {}) {
   const t = useT()
   const lang = useLang()
   const messages = useAgentStore((s) => s.messages)
@@ -132,6 +132,13 @@ export function ChatPanel() {
           <span className="chat-head-name">Agent</span>
           <span className={'chat-head-badge ' + badge.cls}>{badge.text}</span>
         </div>
+        {onCollapse && (
+          <button type="button" className="chat-collapse" onClick={onCollapse} title={t('chat.collapse')}>
+            <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+              <path d="M4 6l4 4 4-4" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" transform="rotate(90 8 8)" />
+            </svg>
+          </button>
+        )}
       </div>
 
       {messages.length === 0 ? (

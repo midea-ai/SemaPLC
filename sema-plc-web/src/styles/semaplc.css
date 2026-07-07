@@ -219,6 +219,10 @@
 .status-dot-label{color:#b9c0cd;font-size:12px;font-weight:500;white-space:nowrap;}
 @keyframes dotpulse{0%,100%{opacity:1;}50%{opacity:.3;}}
 
+/* 布局切换 */
+.layout-toggle{display:flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:7px;
+  background:rgba(255,255,255,.07);color:var(--text-2);cursor:pointer;border:none;transition:background .15s;}
+.layout-toggle:hover{background:rgba(255,255,255,.14);color:#fff;}
 /* 中英切换 */
 .lang-toggle{display:flex;align-items:center;gap:2px;background:rgba(255,255,255,.07);
   border-radius:8px;padding:2px;height:32px;}
@@ -228,12 +232,18 @@
 .lang-toggle button.active{background:rgba(255,255,255,.14);color:#fff;}
 
 /* ===== 主分栏 ===== */
-.main-split{flex:1;display:grid;grid-template-columns:minmax(360px,var(--chat-w)) 1fr;
-  background:var(--bg);min-height:0;padding:12px;gap:12px;}
+.main-split{flex:1;display:flex;background:var(--bg);min-height:0;padding:12px;gap:12px;}
+.resize-handle-v{flex:0 0 5px;cursor:col-resize;background:transparent;border-radius:3px;transition:background .15s;}
+.resize-handle-v:hover,.resize-handle-v[data-resize-handle-active]{background:var(--brand);opacity:.6;}
 
 /* ===== 对话区 ===== */
 .chat-panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--r-out);
-  display:flex;flex-direction:column;min-height:0;overflow:hidden;}
+  display:flex;flex-direction:column;min-height:0;overflow:hidden;height:100%;}
+.chat-collapse{margin-left:auto;background:none;border:none;color:var(--text-3);padding:4px;border-radius:6px;display:flex;align-items:center;justify-content:center;}
+.chat-collapse:hover{color:var(--text-1);background:var(--line);}
+.chat-expand{background:var(--panel);border:1px solid var(--line);border-radius:var(--r-out);
+  display:flex;align-items:center;justify-content:center;color:var(--text-3);padding:0;width:40px;}
+.chat-expand:hover{color:var(--brand);border-color:var(--brand);}
 .chat-head{display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--line);}
 .agent-avatar{width:30px;height:30px;border-radius:9px;background:var(--brand);display:flex;
   align-items:center;justify-content:center;flex:0 0 30px;}
@@ -312,7 +322,7 @@
 
 /* ===== 工件画布 ===== */
 .artifact-canvas{background:var(--panel);border:1px solid var(--line);border-radius:var(--r-out);
-  display:flex;flex-direction:column;min-height:0;overflow:hidden;}
+  display:flex;flex-direction:column;min-height:0;min-width:0;overflow:hidden;flex:1;height:100%;}
 .tab-bar{display:flex;align-items:center;gap:2px;padding:0 10px;border-bottom:1px solid var(--line);flex:0 0 46px;}
 .tab{display:flex;align-items:center;gap:7px;height:46px;padding:0 13px;font-size:13px;font-weight:600;
   color:var(--text-2);position:relative;transition:.12s;background:none;border:none;}
@@ -323,6 +333,9 @@
 .tab-badge{background:var(--brand-soft);color:var(--brand);font-size:10.5px;font-weight:700;
   border-radius:6px;padding:1px 6px;font-family:var(--mono);}
 .canvas-body{flex:1;min-height:0;overflow:hidden;display:flex;flex-direction:column;}
+.split-pane{display:flex;flex-direction:column;flex:1;min-height:0;overflow:hidden;}
+.resize-handle-h{flex:0 0 5px;background:var(--line);cursor:row-resize;transition:background .15s;}
+.resize-handle-h:hover,.resize-handle-h[data-resize-handle-active]{background:var(--brand);opacity:.6;}
 
 /* 工件空态 / 过程仿真占位 */
 .artifact-empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center;padding:24px;}
@@ -335,7 +348,11 @@
 .code-tree{flex:0 0 212px;border-right:1px solid var(--line);background:#FCFCFD;overflow:auto;
   padding:8px 6px;display:flex;flex-direction:column;}
 .tree-head{font-size:11px;font-weight:600;color:var(--text-3);text-transform:uppercase;
-  letter-spacing:.6px;padding:4px 8px 8px;}
+  letter-spacing:.6px;padding:4px 8px 8px;display:flex;align-items:center;justify-content:space-between;}
+.tree-toggle{background:none;border:none;color:var(--text-3);padding:2px;border-radius:4px;display:flex;cursor:pointer;}
+.tree-toggle:hover{color:var(--text-1);background:var(--line);}
+.tree-expand-btn{background:none;border:none;color:var(--text-3);padding:4px;border-radius:6px;display:flex;cursor:pointer;flex:0 0 auto;}
+.tree-expand-btn:hover{color:var(--brand);background:var(--brand-soft);}
 .tree-row{display:flex;align-items:center;gap:7px;height:27px;border-radius:7px;font-size:12.5px;
   color:var(--text-1);cursor:default;font-family:var(--mono);white-space:nowrap;}
 .tree-row.folder{color:var(--text-2);font-weight:600;}

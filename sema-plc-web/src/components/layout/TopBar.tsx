@@ -5,6 +5,7 @@ import { useEditorStore } from '../../store/editor'
 import { useWsConnection } from '../../ws/useWsConnection'
 import { useT, useLang, setLang } from '../../i18n'
 import { ModelPanel } from './ModelPanel'
+import type { LayoutMode } from '../../App'
 
 type Tone = 'ok' | 'idle' | 'warn' | 'err'
 const TONE: Record<Tone, string> = { ok: 'var(--ok)', idle: 'var(--text-3)', warn: 'var(--warn)', err: 'var(--err)' }
@@ -18,7 +19,7 @@ function StatusDot({ tone, label, pulse }: { tone: Tone; label: string; pulse?: 
   )
 }
 
-export function TopBar() {
+export function TopBar({ layout, onToggleLayout }: { layout: LayoutMode; onToggleLayout: () => void }) {
   const t = useT()
   const lang = useLang()
   const workspace = useWorkspaceStore((s) => s.path)
@@ -79,6 +80,13 @@ export function TopBar() {
 
       <div className="tb-right">
         <ModelPanel />
+        <button type="button" className="layout-toggle" onClick={onToggleLayout} title={t(layout === 'split' ? 'topbar.layout.columns' : 'topbar.layout.split')}>
+          {layout === 'split' ? (
+            <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><rect x="1" y="2" width="4.5" height="12" rx="1" fill="none" stroke="currentColor" strokeWidth="1.2"/><rect x="6.5" y="2" width="4" height="12" rx="1" fill="none" stroke="currentColor" strokeWidth="1.2"/><rect x="11.5" y="2" width="3.5" height="12" rx="1" fill="none" stroke="currentColor" strokeWidth="1.2"/></svg>
+          ) : (
+            <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><rect x="1" y="2" width="6" height="12" rx="1" fill="none" stroke="currentColor" strokeWidth="1.2"/><rect x="8" y="2" width="7" height="5" rx="1" fill="none" stroke="currentColor" strokeWidth="1.2"/><rect x="8" y="9" width="7" height="5" rx="1" fill="none" stroke="currentColor" strokeWidth="1.2"/></svg>
+          )}
+        </button>
         <div className="lang-toggle" role="group" aria-label="Language">
           <button type="button" className={lang === 'zh' ? 'active' : ''} aria-pressed={lang === 'zh'} onClick={() => setLang('zh')}>中</button>
           <button type="button" className={lang === 'en' ? 'active' : ''} aria-pressed={lang === 'en'} onClick={() => setLang('en')}>EN</button>

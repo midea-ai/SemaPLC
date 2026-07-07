@@ -25,6 +25,8 @@ const zh = {
   'topbar.run': '运行',
   'topbar.stop.tooltip': '停止运行中的 PLC 程序',
   'topbar.stop': '停止',
+  'topbar.layout.columns': '切换为三栏布局',
+  'topbar.layout.split': '切换为上下分栏',
   // ── chat ──
   'chat.group.toggle': '探查了 {n} 步',
   'chat.turn.error': '本轮出错',
@@ -45,6 +47,8 @@ const zh = {
   'chat.thinking.label': '深度思考',
   'chat.thinking.on': '深度思考已开启',
   'chat.thinking.off': '深度思考已关闭',
+  'chat.collapse': '收起对话栏',
+  'chat.expand': '展开对话栏',
   // ── canvas tabs ──
   'canvas.tab.process': '过程仿真',
   'canvas.tab.code': '代码',
@@ -121,6 +125,8 @@ const zh = {
   'vars.force.held': '已强制锁定',
   // ── code (CodeView) ──
   'code.tree.head': '工程文件',
+  'code.tree.collapse': '收起文件树',
+  'code.tree.expand': '展开文件树',
   'code.tree.empty': '暂无文件。让 Agent 写一个,或在工作区放 .st 文件。',
   'code.badge.sot': '单一事实源',
   'code.badge.gen': '自动生成',
@@ -191,6 +197,8 @@ const en: Record<TKey, string> = {
   'topbar.run': 'Run',
   'topbar.stop.tooltip': 'Stop the running PLC program',
   'topbar.stop': 'Stop',
+  'topbar.layout.columns': 'Switch to three-column layout',
+  'topbar.layout.split': 'Switch to stacked layout',
   // ── chat ──
   'chat.group.toggle': 'Explored {n} steps',
   'chat.turn.error': 'This turn failed',
@@ -211,6 +219,8 @@ const en: Record<TKey, string> = {
   'chat.thinking.label': 'Thinking',
   'chat.thinking.on': 'Thinking enabled',
   'chat.thinking.off': 'Thinking disabled',
+  'chat.collapse': 'Collapse chat',
+  'chat.expand': 'Expand chat',
   // ── canvas tabs ──
   'canvas.tab.process': 'Process Simulation',
   'canvas.tab.code': 'Code',
@@ -287,6 +297,8 @@ const en: Record<TKey, string> = {
   'vars.force.held': 'force-held',
   // ── code ──
   'code.tree.head': 'Project files',
+  'code.tree.collapse': 'Collapse file tree',
+  'code.tree.expand': 'Expand file tree',
   'code.tree.empty': 'No files yet. Ask the Agent to write one, or drop a .st file in the workspace.',
   'code.badge.sot': 'Single source of truth',
   'code.badge.gen': 'Auto-generated',
