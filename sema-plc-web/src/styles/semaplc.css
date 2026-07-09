@@ -11,6 +11,7 @@
   --ok:#22C55E; --warn:#F59E0B; --err:#EF4444;
   --r-out:14px; --r-card:12px; --r-sm:9px;
   --chat-w:40%;
+  --max-bubble:520px; --max-bubble-agent:640px; --max-think:700px; --max-tool:800px;
   --font:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
   --mono:ui-monospace,"SF Mono","JetBrains Mono",Menlo,Consolas,"Courier New",monospace;
 }
@@ -232,17 +233,25 @@
 .lang-toggle button.active{background:rgba(255,255,255,.14);color:#fff;}
 
 /* ===== 主分栏 ===== */
-.main-split{flex:1;display:flex;background:var(--bg);min-height:0;padding:12px;gap:12px;}
+.main-split{flex:1;display:flex;background:var(--bg);min-height:0;padding:12px;gap:12px;position:relative;}
 .resize-handle-v{flex:0 0 5px;cursor:col-resize;background:transparent;border-radius:3px;transition:background .15s;}
 .resize-handle-v:hover,.resize-handle-v[data-resize-handle-active]{background:var(--brand);opacity:.6;}
+/* 命令式收起/展开时给外层 panel 的 flex-grow 加过渡出动画;拖拽期间关掉,避免跟手延迟。
+   只作用到外层 PanelGroup 的直接子 panel——不含内层 ArtifactCanvas 的 panel,否则拖内栏分隔条会因
+   flex-grow 过渡跟手延迟(.dragging 守卫只挂在外层 handle 上)。 */
+.main-split > [data-panel-group] > [data-panel]{transition:flex-grow .22s ease;}
+.main-split.dragging > [data-panel-group] > [data-panel]{transition:none;}
 
 /* ===== 对话区 ===== */
 .chat-panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--r-out);
   display:flex;flex-direction:column;min-height:0;overflow:hidden;height:100%;}
-.chat-collapse{margin-left:auto;background:none;border:none;color:var(--text-3);padding:4px;border-radius:6px;display:flex;align-items:center;justify-content:center;}
+.chat-head-right{margin-left:auto;display:flex;align-items:center;gap:8px;}
+.chat-collapse{background:none;border:none;color:var(--text-3);padding:4px;border-radius:6px;display:flex;align-items:center;justify-content:center;}
 .chat-collapse:hover{color:var(--text-1);background:var(--line);}
-.chat-expand{background:var(--panel);border:1px solid var(--line);border-radius:var(--r-out);
-  display:flex;align-items:center;justify-content:center;color:var(--text-3);padding:0;width:40px;}
+.chat-expand{position:absolute;left:14px;top:50%;transform:translateY(-50%);z-index:20;
+  background:var(--panel);border:1px solid var(--line);border-radius:var(--r-out);
+  display:flex;align-items:center;justify-content:center;color:var(--text-3);padding:0;
+  width:30px;height:56px;box-shadow:0 2px 10px rgba(0,0,0,.08);animation:fadein .18s ease;}
 .chat-expand:hover{color:var(--brand);border-color:var(--brand);}
 .chat-head{display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--line);}
 .agent-avatar{width:30px;height:30px;border-radius:9px;background:var(--brand);display:flex;
@@ -258,9 +267,9 @@
 .bubble-row{display:flex;flex-shrink:0;}
 .bubble-row.user{justify-content:flex-end;}
 .bubble-row.agent{justify-content:flex-start;}
-.bubble{max-width:84%;font-size:13.5px;line-height:1.6;padding:11px 14px;white-space:pre-wrap;word-break:break-word;}
+.bubble{max-width:var(--max-bubble);font-size:13.5px;line-height:1.6;padding:11px 14px;white-space:pre-wrap;word-break:break-word;}
 .bubble.user{background:var(--brand);color:#fff;border-radius:14px 14px 4px 14px;}
-.bubble.agent{background:#F2F3F6;color:var(--text-1);border-radius:14px 14px 14px 4px;}
+.bubble.agent{background:#F2F3F6;color:var(--text-1);border-radius:14px 14px 14px 4px;max-width:var(--max-bubble-agent);}
 /* markdown 渲染:覆盖 pre-wrap(块元素自带换行),并给常见元素基础样式 */
 .bubble.md{white-space:normal;}
 .bubble.md > :first-child{margin-top:0;}
@@ -298,6 +307,9 @@
   display:flex;align-items:center;justify-content:center;transition:.15s;border:none;}
 .send-btn:hover:not(:disabled){filter:brightness(1.08);}
 .send-btn:disabled{opacity:.4;cursor:default;}
+.send-btn.stop{background:#2A2D38;animation:stopPulse 1.4s ease-in-out infinite;}
+.send-btn.stop:hover{filter:none;background:#393C47;}
+@keyframes stopPulse{0%,100%{opacity:.92}50%{opacity:1;box-shadow:0 0 0 4px rgba(255,255,255,.08)}}
 .thinking-toggle{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:14px;
   border:1px solid var(--line);background:transparent;color:var(--text-2);font-size:12px;cursor:pointer;transition:.15s;}
 .thinking-toggle:hover:not(:disabled){border-color:var(--text-2);}
@@ -308,9 +320,9 @@
 .empty-chat{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
   text-align:center;padding:20px;gap:8px;}
 .empty-agent-mark{margin-bottom:6px;opacity:.9;}
-.empty-title{font-size:17px;font-weight:700;margin:0;max-width:300px;line-height:1.4;}
-.empty-sub{font-size:12.5px;color:var(--text-2);margin:0 0 14px;max-width:320px;line-height:1.6;}
-.empty-chips{display:flex;flex-direction:column;gap:8px;width:100%;max-width:330px;}
+.empty-title{font-size:17px;font-weight:700;margin:0;max-width:380px;line-height:1.4;}
+.empty-sub{font-size:12.5px;color:var(--text-2);margin:0 0 14px;max-width:400px;line-height:1.6;}
+.empty-chips{display:flex;flex-direction:column;gap:8px;width:100%;max-width:440px;}
 .prompt-chip{text-align:left;border:1px solid var(--line);border-radius:10px;padding:11px 13px;
   font-size:13px;color:var(--text-1);background:#FCFCFD;transition:.15s;}
 .prompt-chip:hover{border-color:var(--brand);background:var(--brand-soft);}
@@ -333,7 +345,7 @@
 .tab-badge{background:var(--brand-soft);color:var(--brand);font-size:10.5px;font-weight:700;
   border-radius:6px;padding:1px 6px;font-family:var(--mono);}
 .canvas-body{flex:1;min-height:0;overflow:hidden;display:flex;flex-direction:column;}
-.split-pane{display:flex;flex-direction:column;flex:1;min-height:0;overflow:hidden;}
+.split-pane{display:flex;flex-direction:column;flex:1;min-height:0;overflow:hidden;height:100%;width:100%;}
 .resize-handle-h{flex:0 0 5px;background:var(--line);cursor:row-resize;transition:background .15s;}
 .resize-handle-h:hover,.resize-handle-h[data-resize-handle-active]{background:var(--brand);opacity:.6;}
 
@@ -344,7 +356,7 @@
 .ae-sub{font-size:12px;color:var(--text-3);margin:0;max-width:360px;line-height:1.6;}
 
 /* ===== 代码视图(文件树 + 高亮) ===== */
-.code-view2{flex:1;display:flex;min-height:0;background:#FBFBFC;}
+.code-view2{flex:1;display:flex;min-height:0;min-width:0;overflow:hidden;background:#FBFBFC;}
 .code-tree{flex:0 0 212px;border-right:1px solid var(--line);background:#FCFCFD;overflow:auto;
   padding:8px 6px;display:flex;flex-direction:column;}
 .tree-head{font-size:11px;font-weight:600;color:var(--text-3);text-transform:uppercase;
@@ -370,7 +382,7 @@
 .tree-badge{font-size:11px;flex:0 0 auto;}
 .tree-badge.sot{color:var(--brand);}
 .tree-badge.gen{color:var(--text-3);}
-.code-main{flex:1;display:flex;flex-direction:column;min-width:0;}
+.code-main{flex:1;display:flex;flex-direction:column;min-width:0;min-height:0;overflow:hidden;}
 .code-filebar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:9px 16px;
   border-bottom:1px solid var(--line);background:var(--panel);}
 .code-fname{font-size:12.5px;font-weight:600;font-family:var(--mono);color:var(--text-1);
@@ -382,8 +394,8 @@
 .code-check:hover:not(:disabled){border-color:var(--brand);color:var(--brand);}
 .code-check:disabled{opacity:.45;cursor:default;}
 .code-scroll{flex:1;overflow:auto;min-height:0;}
-.code-cm{flex:1;min-height:0;display:flex;}
-.code-cm .cm-editor{flex:1;min-height:0;}
+.code-cm{flex:1;min-height:0;min-width:0;overflow:hidden;display:flex;}
+.code-cm .cm-editor{flex:1;min-height:0;min-width:0;}
 .code-btn{font-size:11.5px;font-weight:600;color:var(--text-2);border:1px solid var(--line);
   border-radius:6px;padding:3px 9px;background:#fff;cursor:pointer;}
 .code-btn:hover:not(:disabled){border-color:var(--brand);color:var(--brand);}
@@ -415,14 +427,14 @@
 
 /* ── 块渲染：thinking 折叠块 / 工具卡片 ── */
 .turn{display:flex;flex-direction:column;gap:8px;}
-.think-block{border:1px solid var(--line);border-radius:10px;background:rgba(255,255,255,.03);max-width:84%;}
+.think-block{border:1px solid var(--line);border-radius:10px;background:rgba(255,255,255,.03);max-width:var(--max-think);}
 .think-head{display:flex;align-items:center;gap:7px;width:100%;padding:7px 11px;background:none;border:none;cursor:pointer;color:var(--text-2);font-size:12.5px;}
 .think-dot{width:7px;height:7px;border-radius:50%;background:var(--text-2);}
 .think-dot.pulse{animation:thinkPulse 1.2s ease-in-out infinite;background:var(--brand);}
 @keyframes thinkPulse{0%,100%{opacity:.35}50%{opacity:1}}
 .think-caret{margin-left:auto;opacity:.6;}
 .think-body{padding:4px 12px 10px;font-size:12.5px;line-height:1.6;color:var(--text-2);white-space:pre-wrap;word-break:break-word;border-top:1px dashed var(--line);}
-.tool-card{border:1px solid var(--line);border-radius:10px;background:rgba(255,255,255,.02);max-width:84%;font-size:12.5px;}
+.tool-card{border:1px solid var(--line);border-radius:10px;background:rgba(255,255,255,.02);font-size:12.5px;max-width:var(--max-tool);}
 .tool-card.st-error{border-color:var(--err);}
 .tool-head{display:flex;align-items:center;gap:8px;padding:8px 11px;}
 .tool-name{font-family:var(--mono);font-size:12px;color:var(--text-1);}
@@ -490,7 +502,7 @@
 /* skill */
 .skill-args{font-family:var(--mono);color:var(--text-2);font-size:11.5px;white-space:pre-wrap;word-break:break-word;}
 /* 连续探查工具分组 */
-.tool-group{border:1px solid var(--line);border-radius:10px;background:rgba(255,255,255,.02);max-width:84%;}
+.tool-group{border:1px solid var(--line);border-radius:10px;background:rgba(255,255,255,.02);max-width:var(--max-tool);}
 .tool-group-head{display:flex;align-items:center;gap:6px;width:100%;padding:7px 11px;background:none;border:none;cursor:pointer;color:var(--text-2);font-size:12px;text-align:left;}
 .tool-group-body{padding:4px 6px 8px 14px;border-top:1px dashed var(--line);display:flex;flex-direction:column;gap:6px;}
 /* markdown 折叠 / 复制 */

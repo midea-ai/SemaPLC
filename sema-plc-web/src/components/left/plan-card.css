@@ -1,13 +1,32 @@
-/* 执行计划卡片 — lifted from SemaPLC design (standalone-src.html) */
-.plan-card{border:1px solid var(--line);border-radius:var(--r-card);background:#FCFCFD;
-  overflow:hidden;flex-shrink:0;animation:fadein .3s ease;}
-.plan-head{display:flex;align-items:center;gap:8px;padding:11px 14px;border-bottom:1px solid var(--line);
-  background:var(--panel);}
-.plan-gear{color:var(--text-2);display:flex;animation:spin 6s linear infinite;}
-.plan-title{font-size:13px;font-weight:700;flex:1;}
-.plan-progress{font-size:12px;font-weight:700;color:var(--brand);font-family:var(--mono);
+/* 执行计划指示器 — 固定在对话栏右上方:处理中齿轮+进度,完成收成绿✓,点击下拉看全部步骤 */
+
+/* —— 右上方按钮 —— */
+.plan-indicator{position:relative;flex-shrink:0;}
+.plan-ind-btn{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 11px 0 8px;
+  border-radius:14px;border:1px solid var(--line);background:#fff;color:var(--text-2);
+  cursor:pointer;font-size:12px;font-weight:600;transition:.15s;}
+.plan-ind-btn:hover{border-color:var(--brand);color:var(--text-1);}
+.plan-ind-ic{display:flex;align-items:center;justify-content:center;width:16px;height:16px;}
+.plan-ind-ic.gear{color:var(--text-3);animation:spin 6s linear infinite;}
+.plan-ind-btn.busy{border-color:var(--brand);color:var(--brand);background:var(--brand-soft);}
+.plan-ind-btn.busy .plan-ind-ic.gear{color:var(--brand);}
+.plan-ind-btn.done{border-color:#CDEBD9;color:var(--ok);background:#E9F9EF;}
+.plan-ind-btn.done .plan-ind-ic{color:var(--ok);}
+.plan-ind-count{font-family:var(--mono);font-size:11.5px;}
+
+/* —— 下拉详情弹层 —— */
+.plan-popover{position:absolute;top:calc(100% + 6px);right:0;z-index:50;
+  min-width:260px;max-width:min(340px,72vw);
+  border:1px solid var(--line);border-radius:var(--r-card);background:#FCFCFD;
+  box-shadow:0 8px 28px rgba(0,0,0,.12);overflow:hidden;animation:fadein .15s ease;}
+.plan-pop-head{display:flex;align-items:center;gap:8px;padding:10px 14px;
+  border-bottom:1px solid var(--line);background:var(--panel);}
+.plan-pop-head .plan-title{font-size:13px;font-weight:700;flex:1;}
+.plan-pop-head .plan-progress{font-size:12px;font-weight:700;color:var(--brand);font-family:var(--mono);
   background:var(--brand-soft);padding:2px 8px;border-radius:6px;}
-.plan-steps{padding:6px 8px;display:flex;flex-direction:column;}
+
+/* —— 步骤行(弹层内复用) —— */
+.plan-steps{padding:6px 8px;display:flex;flex-direction:column;max-height:50vh;overflow:auto;}
 .plan-step{display:flex;align-items:center;gap:10px;padding:7px 8px;font-size:13px;border-radius:7px;}
 .plan-step.st-active{background:var(--brand-soft);}
 .plan-step.st-error{background:#FDECEC;}
@@ -21,6 +40,6 @@
 .step-half{position:absolute;inset:-1.8px;border-radius:50%;border:1.8px solid transparent;
   border-top-color:var(--brand);border-right-color:var(--brand);animation:spin .8s linear infinite;}
 @keyframes spin{to{transform:rotate(360deg);}}
-@keyframes fadein{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:none;}}
+@keyframes fadein{from{opacity:0;transform:translateY(-4px);}to{opacity:1;transform:none;}}
 .step-main{flex:1;display:flex;flex-direction:column;gap:1px;min-width:0;}
 .step-sub{font-size:11px;color:var(--text-3);font-family:var(--font);line-height:1.3;}

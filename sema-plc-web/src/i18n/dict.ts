@@ -44,6 +44,8 @@ const zh = {
   'chat.input.placeholder.connecting': '连接后端中…',
   'chat.input.placeholder.offline': '后端离线(将自动重连)',
   'chat.send': '发送',
+  'chat.stop': '停止',
+  'chat.stop.tooltip': '中断当前 Agent 任务',
   'chat.thinking.label': '深度思考',
   'chat.thinking.on': '深度思考已开启',
   'chat.thinking.off': '深度思考已关闭',
@@ -156,6 +158,7 @@ const zh = {
   'ladder.head.notRunning': '未运行',
   // ── plan ──
   'plan.title': '执行计划',
+  'plan.label': '计划',
   'plan.note.done': '完成',
   'plan.note.active': '进行中…',
   'plan.note.fixing': 'Agent 正在修复…',
@@ -216,6 +219,8 @@ const en: Record<TKey, string> = {
   'chat.input.placeholder.connecting': 'Connecting to backend…',
   'chat.input.placeholder.offline': 'Backend offline (will auto-reconnect)',
   'chat.send': 'Send',
+  'chat.stop': 'Stop',
+  'chat.stop.tooltip': 'Abort the current agent task',
   'chat.thinking.label': 'Thinking',
   'chat.thinking.on': 'Thinking enabled',
   'chat.thinking.off': 'Thinking disabled',
@@ -328,6 +333,7 @@ const en: Record<TKey, string> = {
   'ladder.head.notRunning': 'Not running',
   // ── plan ──
   'plan.title': 'Execution plan',
+  'plan.label': 'Plan',
   'plan.note.done': 'Done',
   'plan.note.active': 'In progress…',
   'plan.note.fixing': 'Agent is fixing…',

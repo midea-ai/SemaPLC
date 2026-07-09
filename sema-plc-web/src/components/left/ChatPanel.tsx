@@ -5,7 +5,7 @@ import { useModelStore } from '../../store/model'
 import { useWsConnection } from '../../ws/useWsConnection'
 import { useT, useLang } from '../../i18n'
 import { scenarios } from '../../i18n/scenarios'
-import { PlanCard } from './PlanCard'
+import { PlanIndicator } from './PlanCard'
 import { ThinkingBlock } from './blocks/ThinkingBlock'
 import { ToolBlock } from './blocks/tools/ToolBlock'
 import { groupBlocks } from './blocks/tools/groupBlocks'
@@ -98,7 +98,9 @@ export function ChatPanel({ onCollapse }: { onCollapse?: () => void } = {}) {
   const thinking = useModelStore((s) => s.thinking)
   const toggleThinking = () => send({ type: 'model:set-thinking', enabled: !thinking })
   useEffect(() => {
-    if (pinnedRef.current) scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight })
+    // 收起时面板 clientHeight=0:跳过读 scrollHeight(强制布局)和滚动,避免对隐藏元素每 token 触发同步 reflow
+    const el = scrollRef.current
+    if (pinnedRef.current && el && el.clientHeight > 0) el.scrollTo({ top: el.scrollHeight })
   }, [messages])  // zustand 每次更新都换 messages 引用 → 每个 delta 触发
 
   const inputDisabled = status !== 'open'
@@ -132,13 +134,16 @@ export function ChatPanel({ onCollapse }: { onCollapse?: () => void } = {}) {
           <span className="chat-head-name">Agent</span>
           <span className={'chat-head-badge ' + badge.cls}>{badge.text}</span>
         </div>
-        {onCollapse && (
-          <button type="button" className="chat-collapse" onClick={onCollapse} title={t('chat.collapse')}>
-            <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
-              <path d="M4 6l4 4 4-4" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" transform="rotate(90 8 8)" />
-            </svg>
-          </button>
-        )}
+        <div className="chat-head-right">
+          <PlanIndicator processing={agentState === 'processing'} todos={todos} />
+          {onCollapse && (
+            <button type="button" className="chat-collapse" onClick={onCollapse} title={t('chat.collapse')}>
+              <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+                <path d="M4 6l4 4 4-4" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" transform="rotate(90 8 8)" />
+              </svg>
+            </button>
+          )}
+        </div>
       </div>
 
       {messages.length === 0 ? (
@@ -174,7 +179,6 @@ export function ChatPanel({ onCollapse }: { onCollapse?: () => void } = {}) {
           {messages.map((m) => (
             <Bubble key={m.id} m={m} onRetry={() => retry()} retryDisabled={agentState === 'processing'} />
           ))}
-          <PlanCard processing={agentState === 'processing'} todos={todos} />
           {agentState === 'processing' && (
             <div className="bubble-row agent"><div className="bubble agent"><span className="typing"><span /><span /><span /></span></div></div>
           )}
@@ -210,9 +214,23 @@ export function ChatPanel({ onCollapse }: { onCollapse?: () => void } = {}) {
             onKeyDown={(e) => { if (shouldSubmitOnEnter(e, composingRef.current)) { e.preventDefault(); if (!sendDisabled) submit() } }}
             disabled={inputDisabled}
           />
-          <button className="send-btn" onClick={() => submit()} disabled={sendDisabled} title={t('chat.send')}>
-            <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 8h11M9 4l4 4-4 4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" /></svg>
-          </button>
+          {agentState === 'processing' ? (
+            <button
+              type="button"
+              className="send-btn stop"
+              onClick={() => send({ type: 'agent:interrupt' })}
+              disabled={status !== 'open'}
+              title={t('chat.stop.tooltip')}
+              aria-label={t('chat.stop')}
+            >
+              {/* 两条竖线(暂停样式)— 处理中时取代发送箭头,点击发 agent:interrupt 中断当前 turn */}
+              <svg width="13" height="13" viewBox="0 0 16 16" aria-hidden="true"><rect x="3.5" y="3" width="3" height="10" rx="1.2" fill="currentColor" /><rect x="9.5" y="3" width="3" height="10" rx="1.2" fill="currentColor" /></svg>
+            </button>
+          ) : (
+            <button className="send-btn" onClick={() => submit()} disabled={sendDisabled} title={t('chat.send')} aria-label={t('chat.send')}>
+              <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 8h11M9 4l4 4-4 4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" /></svg>
+            </button>
+          )}
         </div>
       </div>
     </section>
