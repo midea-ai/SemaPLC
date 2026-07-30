@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from 'react'
 import { highlight } from '../../../lib/codeHighlight'
 import type { ToolBlockResult } from '../../../../shared/protocol'
+import { Caret } from './Caret'
 import { useT } from '../../../i18n'
 
 export interface ToolCardData {
@@ -28,7 +29,7 @@ function Section({ label, children }: { label: string; children: ReactNode }) {
   const [open, setOpen] = useState(false)
   return (
     <div className="tool-sec">
-      <button type="button" className="tool-sec-head" aria-expanded={open} onClick={() => setOpen((o) => !o)}>{open ? '▾' : '▸'} {label}</button>
+      <button type="button" className="tool-sec-head" aria-expanded={open} onClick={() => setOpen((o) => !o)}><Caret open={open} /> {label}</button>
       {open && children}
     </div>
   )

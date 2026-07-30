@@ -6,6 +6,7 @@ import { useWsConnection } from '../../ws/useWsConnection'
 import { useT, useLang } from '../../i18n'
 import { scenarios } from '../../i18n/scenarios'
 import { PlanIndicator } from './PlanCard'
+import { Caret } from './blocks/Caret'
 import { ThinkingBlock } from './blocks/ThinkingBlock'
 import { ToolBlock } from './blocks/tools/ToolBlock'
 import { groupBlocks } from './blocks/tools/groupBlocks'
@@ -46,7 +47,7 @@ function GroupCard({ blocks }: { blocks: AgentBlock[] }) {
   return (
     <div className="tool-group">
       <button type="button" className="tool-group-head" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
-        {open ? '▾' : '▸'} {t('chat.group.toggle', { n: blocks.length })}
+        <Caret open={open} /> {t('chat.group.toggle', { n: blocks.length })}
       </button>
       {open && <div className="tool-group-body">{blocks.map((b) => <BlockView key={b.id} block={b} />)}</div>}
     </div>
