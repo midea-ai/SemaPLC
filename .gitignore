@@ -22,6 +22,10 @@ coverage/
 .env
 .env.local
 
+# 运行时用户数据(服务从仓库根启动,写在 cwd)
+custom-models.json
+key-overrides.json
+
 # brainstorm visual companion sessions
 .superpowers/
 
