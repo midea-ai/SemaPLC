@@ -253,10 +253,16 @@ export function SimRuntime() {
         </div>
       )}
       <div className="sim-stage">
+        {/* contain-fit:svg 铺满 stage,preserveAspectRatio 把画面等比放到最大;
+            画布底色/边框改画在 viewBox 内的 rect 上,所以"卡片"始终紧贴画面而非 stage。
+            (原来 maxWidth=canvas.width 把画面锁死在作者尺寸,窄高栏里上下大片留白) */}
         <svg ref={svgRef}
              viewBox={`0 0 ${canvas.width} ${canvas.height}`}
-             style={{ background: canvas.background ?? '#ffffff', border: '1px solid #e5e7eb', borderRadius: 8,
-                      width: '100%', maxWidth: canvas.width, height: 'auto', maxHeight: '100%' }}>
+             preserveAspectRatio="xMidYMid meet"
+             style={{ width: '100%', height: '100%', display: 'block' }}>
+          <rect x="0.5" y="0.5" width={canvas.width - 1} height={canvas.height - 1} rx="8"
+                fill={canvas.background ?? '#ffffff'} stroke="#e5e7eb"
+                vectorEffect="non-scaling-stroke" />
           {parts.map((p) => (
             <Part key={p.id} part={p} pose={layout?.get(p.id) ?? null}
                   input={interactive ? inputVarOf(p) : null} />
