@@ -88,8 +88,8 @@ node dist/cli.js serve                                 # 改以 MCP stdio 服务
 
 ```bash
 # 1. 克隆
-git clone <this-repo-url> sema-plc
-cd sema-plc
+git clone https://github.com/midea-ai/SemaPLC.git
+cd SemaPLC
 
 # 2. 构建工具链(web 应用会直接 import 它的 dist/)
 cd sema-plc-tools && npm install && npm run build && cd ..
@@ -151,8 +151,8 @@ PLC_MODEL=openai ./dev.sh
 ## 🧪 测试
 
 ```bash
-cd sema-plc-tools && npm test     # 542 个测试(无需 Docker)
-cd sema-plc-web   && npm test     # 224 个测试(后端:vitest/node,前端:vitest/jsdom)
+cd sema-plc-tools && npm test     # 无需 Docker
+cd sema-plc-web   && npm test     # 后端:vitest/node,前端:vitest/jsdom
 ```
 
 ## 🤝 致谢
