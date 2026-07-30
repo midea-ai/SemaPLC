@@ -61,7 +61,7 @@ function Tree({ node, depth, active, onSelect }: { node: TreeNode; depth: number
   )
 }
 
-export function CodeView() {
+export function CodeView({ defaultTreeOpen = true }: { defaultTreeOpen?: boolean } = {}) {
   const t = useT()
   const files = useEditorStore((s) => s.files)
   const currentPath = useEditorStore((s) => s.currentPath)
@@ -73,7 +73,7 @@ export function CodeView() {
   const appendLog = useLogsStore((s) => s.append)
   const { send } = useWsConnection()
   const [checking, setChecking] = useState(false)
-  const [treeOpen, setTreeOpen] = useState(true)
+  const [treeOpen, setTreeOpen] = useState(defaultTreeOpen)
 
   const tree = useMemo(() => buildTree(files.map((f) => f.path)), [files])
   const lang = currentPath ? langOf(currentPath) : 'st'

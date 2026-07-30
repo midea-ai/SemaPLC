@@ -50,7 +50,8 @@ export function ArtifactCanvas({ layout }: { layout: LayoutMode }) {
         ))}
       </div>
       <div className="canvas-body">
-        <Pane show={mainTab === 'code'}><CodeView /></Pane>
+        {/* 三栏模式代码栏窄,文件树默认收起(切布局时 PanelGroup key={layout} 重挂载,初始值即生效) */}
+        <Pane show={mainTab === 'code'}><CodeView defaultTreeOpen={layout !== 'columns'} /></Pane>
         <Pane show={mainTab === 'logic'}><LadderCanvas stCode={stCode} /></Pane>
       </div>
     </div>
