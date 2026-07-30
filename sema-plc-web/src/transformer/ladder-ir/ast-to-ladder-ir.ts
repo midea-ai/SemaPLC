@@ -145,6 +145,7 @@ export function networkEq(a: ContactNetwork, b: ContactNetwork): boolean {
  * node/edge grouping in buildDiagram).
  */
 export function mergeSharedOutputs(rungs: LadderRungIR[]): LadderRungIR[] {
+  // 不改入参:每条进 merged 的 rung 先浅拷贝,合并只写这份副本的 output。
   const merged: LadderRungIR[] = [];
 
   for (const rung of rungs) {
@@ -160,7 +161,7 @@ export function mergeSharedOutputs(rungs: LadderRungIR[]): LadderRungIR[] {
         : { type: 'multi', outputs: [prev.output, rung.output] };
       continue;
     }
-    merged.push(rung);
+    merged.push({ ...rung });
   }
 
   return merged.map((rung, i) => ({ ...rung, index: i, id: `rung_${i}` }));

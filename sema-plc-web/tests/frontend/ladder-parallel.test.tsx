@@ -106,3 +106,36 @@ describe('output-side parallels', () => {
     expect(rungs.map((r) => r.id)).toEqual(['rung_0', 'rung_1'])
   })
 })
+
+// 触点标签在 glyph 上方居中绘制,可远宽于 glyph 本身(18px)。measure() 必须按标签取宽,
+// 否则一串长名触点串联时标签会连成一片(比较块早已按 cmpHalfW 这么做了)。
+describe('contact slots sized by their name label', () => {
+  const vbWidth = (svg: string): number => {
+    const m = svg.match(/viewBox="0 0 ([\d.]+) [\d.]+"/)
+    if (!m) throw new Error('no viewBox')
+    return parseFloat(m[1])
+  }
+
+  it('keeps the default width for short names', () => {
+    expect(vbWidth(render('Motor := A AND B AND C AND D;'))).toBe(720)
+  })
+
+  it('widens the rung when long names need more room than the glyphs do', () => {
+    const long = transformSTToLadderIR(
+      `PROGRAM Main\nVAR\n  emergency_stop_latched, safety_chain_healthy, drive_fault_feedback,`
+      + ` main_power_present, homing_sequence_done, Motor : BOOL;\nEND_VAR\n`
+      + `Motor := emergency_stop_latched AND safety_chain_healthy AND drive_fault_feedback`
+      + ` AND main_power_present AND homing_sequence_done;\nEND_PROGRAM`,
+    )
+    expect(long.errors).toEqual([])
+    const svg = renderToStaticMarkup(
+      <LadderRungView ir={long.ir as LadderIR} values={{}} running={false} />,
+    )
+    // 5 个 ~20 字符的名字 ≈ 5×140px,远超 5×66px 的 glyph 自然宽 → 必须扩宽
+    expect(vbWidth(svg)).toBeGreaterThan(720)
+    // 每个名字仍只画一次(扩宽不该丢件或重画)
+    for (const n of ['emergency_stop_latched', 'homing_sequence_done']) {
+      expect(svg.split(`>${n}</text>`).length - 1).toBe(1)
+    }
+  })
+})

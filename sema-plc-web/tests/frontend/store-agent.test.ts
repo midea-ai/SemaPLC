@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { useAgentStore, subscribeAgentToWs, handleAgentWsMessage } from '../../src/store/agent'
+import { useAgentStore, subscribeAgentToWs, handleAgentWsMessage, flushAgentPersist } from '../../src/store/agent'
 import type { ServerMessage } from '../../shared/protocol'
 
 beforeEach(async () => {
@@ -64,6 +64,7 @@ describe('agent store — 刷新持久化 (persist)', () => {
     useAgentStore.getState().appendUser('hello')
     handleAgentWsMessage({ type: 'agent:turn-start', turnId: 'T1' })
     handleAgentWsMessage({ type: 'agent:turn-end', turnId: 'T1', status: 'done' })
+    flushAgentPersist()   // 落盘是 300ms throttle 的尾沿写,同步读前先 flush
     const parsed = JSON.parse(localStorage.getItem('semaplc:agent-chat')!)
     expect(parsed.state.messages.map((m: { kind: string }) => m.kind)).toEqual(['user', 'agent'])
     expect(parsed.state).not.toHaveProperty('state')
@@ -72,8 +73,18 @@ describe('agent store — 刷新持久化 (persist)', () => {
 
   it('streaming 的进行中 turn 不持久化（避免刷新后卡死在 streaming）', () => {
     handleAgentWsMessage({ type: 'agent:turn-start', turnId: 'Ts' }) // turn 容器默认 status=streaming
+    flushAgentPersist()
     const raw = localStorage.getItem('semaplc:agent-chat')!
     const parsed = JSON.parse(raw)
     expect(parsed.state.messages).toHaveLength(0) // 被 partialize 过滤掉
+  })
+
+  // 落盘走 300ms throttle 尾沿:关页面落在窗口内会丢最后一批消息 → pagehide 必须同步 flush。
+  it('pagehide 同步 flush 未落盘的消息（不等 300ms）', () => {
+    useAgentStore.getState().appendUser('末条消息')
+    expect(localStorage.getItem('semaplc:agent-chat')).toBeNull()   // throttle 窗口内还没写
+    window.dispatchEvent(new Event('pagehide'))
+    const parsed = JSON.parse(localStorage.getItem('semaplc:agent-chat')!)
+    expect(parsed.state.messages.map((m: { text: string }) => m.text)).toEqual(['末条消息'])
   })
 })

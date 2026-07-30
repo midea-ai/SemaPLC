@@ -40,17 +40,28 @@ function updateBlock(blocks: AgentBlock[], blockId: string, fn: (b: AgentBlock) 
 // 持久化——那些由后端 turn-snapshot 在重连时恢复,避免刷新后卡死在 streaming 状态。
 // 浏览器外的环境（如 node 测试）没有 localStorage → 退化为内存 noop，避免 persist 崩。
 const noopStorage = { getItem: () => null, setItem: () => {}, removeItem: () => {} }
-// ponytail: 流式输出每个 delta 都触发 persist，throttle 避免主线程压力
+// ponytail: 流式输出每个 delta 都触发 persist，throttle 避免主线程压力。
+// 只有尾沿写入 → 关页面/刷新落在窗口内会丢最后一批消息,故在 pagehide 同步 flush
+// (pagehide 而非 beforeunload:移动端/后台标签只有前者可靠触发)。
+export const flushAgentPersist = (): void => pendingFlush?.()
+let pendingFlush: (() => void) | null = null
+
 function throttledStorage(base: Storage) {
   let timer: ReturnType<typeof setTimeout> | null = null
   let pending: [string, string] | null = null
+  const write = () => {
+    if (timer) { clearTimeout(timer); timer = null }
+    if (pending) { base.setItem(pending[0], pending[1]); pending = null }
+  }
+  pendingFlush = write
+  if (typeof window !== 'undefined') window.addEventListener('pagehide', write)
   return {
     getItem: (k: string) => base.getItem(k),
     setItem: (k: string, v: string) => {
       pending = [k, v]
-      if (!timer) timer = setTimeout(() => { if (pending) base.setItem(pending[0], pending[1]); pending = null; timer = null }, 300)
+      if (!timer) timer = setTimeout(write, 300)
     },
-    removeItem: (k: string) => base.removeItem(k),
+    removeItem: (k: string) => { pending = null; base.removeItem(k) },
   }
 }
 const MAX_HISTORY = 60

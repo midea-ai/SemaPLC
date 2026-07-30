@@ -148,10 +148,12 @@ function cmpLabel(c: ComparatorElement): string {
   return `${c.leftOperand} ${CMP_OP_SYM[c.operator] ?? c.operator} ${c.rightOperand}`
 }
 
-/** Half-width of the comparator box, sized to fit its label.
- *  ponytail: 6.6px/char estimate for 11px mono (.ld-name), not real text measuring. */
+/** ponytail: 6.6px/char 估算 11px 等宽字体(.ld-name)的宽度,不做真实文本测量。 */
+const labelW = (s: string) => s.length * 6.6
+
+/** Half-width of the comparator box, sized to fit its label. */
 function cmpHalfW(c: ComparatorElement): number {
-  return Math.max(39, Math.ceil((cmpLabel(c).length * 6.6) / 2) + 10)
+  return Math.max(39, Math.ceil(labelW(cmpLabel(c)) / 2) + 10)
 }
 
 function comparatorGlyph(c: ComparatorElement, x: number, cy: number, pin: boolean, lk: LiveLookup) {
@@ -240,17 +242,6 @@ function flattenNetwork(net: ContactNetwork): FlatEl[] {
   }
 }
 
-function branchConducts(row: FlatEl[], lk: LiveLookup): boolean {
-  for (const slot of row) {
-    if (slot.t === 'contact' && !contactPasses(slot.el, lk)) return false
-    if (slot.t === 'comparator' && !comparatorPasses(slot.el, lk)) return false
-    if (slot.t === 'branch') {
-      if (!slot.branches.some((b) => branchConducts(b, lk))) return false
-    }
-  }
-  return true
-}
-
 // ── Output description ───────────────────────────────────────────────────────
 
 type OutputSpec =
@@ -300,9 +291,16 @@ const BLOCK_HW = 43 + 30
 
 type Size = { w: number; h: number }
 
-/** Natural size of one slot, including the stub wires its glyph draws. */
+const LABEL_GAP = 8   // minimum clearance between two neighbouring name labels
+
+/** Natural size of one slot, including the stub wires its glyph draws.
+ *  A contact's glyph is only 18px wide but its name label is centred above it and
+ *  can be far wider — take whichever binds, so a series of long-named contacts
+ *  (`fault_reset_trig.Q` AND `safety_chain` AND …) can't run their labels together. */
 function measure(el: FlatEl): Size {
-  if (el.t === 'contact') return { w: 18 + STUB * 2, h: ROW_H }
+  if (el.t === 'contact') {
+    return { w: Math.max(18 + STUB * 2, labelW(el.el.variable) + LABEL_GAP), h: ROW_H }
+  }
   if (el.t === 'comparator') return { w: cmpHalfW(el.el) * 2 + STUB * 2, h: ROW_H }
   const rows = el.branches.map(measureRow)
   return {
