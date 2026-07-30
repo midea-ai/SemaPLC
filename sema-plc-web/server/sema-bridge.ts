@@ -347,6 +347,7 @@ export class SemaBridge {
       }
       case 'internal:set-thinking': {
         try {
+          if (!this.core) return
           this.core.updateCoreConfig({ thinking: m.enabled })
           setRuntimeThinking(m.enabled)
           this.emitModelConfig()

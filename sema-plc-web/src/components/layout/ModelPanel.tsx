@@ -42,6 +42,7 @@ export function ModelPanel() {
   const modelSelected = useModelStore((s) => s.selected)
   const modelActive = useModelStore((s) => s.active)
   const modelOptions = useModelStore((s) => s.options)
+  const thinking = useModelStore((s) => s.thinking)
   const { send, status: wsStatus } = useWsConnection()
 
   const [modelOpen, setModelOpen] = useState(false)
@@ -67,26 +68,30 @@ export function ModelPanel() {
   const [dragModel, setDragModel] = useState<string | null>(null)
   const [dragOverModel, setDragOverModel] = useState<string | null>(null)
 
+  const reorder = (list: string[], from: string, to: string): string[] | null => {
+    const arr = [...list]
+    const fi = arr.indexOf(from); const ti = arr.indexOf(to)
+    if (fi < 0 || ti < 0 || fi === ti) return null
+    arr.splice(fi, 1); arr.splice(ti, 0, from)
+    return arr
+  }
   const reorderVendors = (currentOrder: string[], from: string, to: string) => {
-    const arr = [...currentOrder]
-    const fi = arr.indexOf(from)
-    const ti = arr.indexOf(to)
-    if (fi < 0 || ti < 0 || fi === ti) return
-    arr.splice(fi, 1)
-    arr.splice(ti, 0, from)
+    const arr = reorder(currentOrder, from, to)
+    if (!arr) return
     setSavedVendorOrder(arr)
     localStorage.setItem('semaplc:vendor-order', JSON.stringify(arr))
   }
   const reorderModels = (vendor: string, currentKeys: string[], fromKey: string, toKey: string) => {
-    const arr = [...currentKeys]
-    const fi = arr.indexOf(fromKey)
-    const ti = arr.indexOf(toKey)
-    if (fi < 0 || ti < 0 || fi === ti) return
-    arr.splice(fi, 1)
-    arr.splice(ti, 0, fromKey)
+    const arr = reorder(currentKeys, fromKey, toKey)
+    if (!arr) return
     const next = { ...savedModelOrder, [vendor]: arr }
     setSavedModelOrder(next)
     localStorage.setItem('semaplc:model-order', JSON.stringify(next))
+  }
+
+  const sortByOrder = (order: string[]) => (a: string, b: string) => {
+    const ia = order.indexOf(a); const ib = order.indexOf(b)
+    if (ia < 0 && ib < 0) return 0; if (ia < 0) return 1; if (ib < 0) return -1; return ia - ib
   }
 
   const currentModelName = modelActive
@@ -158,6 +163,7 @@ export function ModelPanel() {
                 <span className="model-pop-led" />
                 <span className="model-pop-current-name">{currentModelName}</span>
                 {modelActive && <span className="model-pop-current-key">{modelActive.key}</span>}
+                {thinking !== null && <span className="model-pop-thinking">{thinking ? (lang === 'zh' ? '💡 思考' : '💡 Thinking') : (lang === 'zh' ? '💡 关' : '💡 Off')}</span>}
               </div>
             </div>
             <button type="button" className="model-pop-close" onClick={() => setModelOpen(false)} aria-label="Close">×</button>
@@ -176,17 +182,10 @@ export function ModelPanel() {
               }
               if (customModels.length > 0) rawOrder.push('custom')
               const order = savedVendorOrder
-                ? [...rawOrder].sort((a, b) => {
-                    const ia = savedVendorOrder.indexOf(a)
-                    const ib = savedVendorOrder.indexOf(b)
-                    if (ia < 0 && ib < 0) return 0
-                    if (ia < 0) return 1
-                    if (ib < 0) return -1
-                    return ia - ib
-                  })
+                ? [...rawOrder].sort(sortByOrder(savedVendorOrder))
                 : rawOrder
               const selVendor = modelSelected ? (modelSelected.startsWith('custom') ? 'custom' : vendorOf(modelSelected)) : null
-              const activeVendor = vendorSel && (vendorSel === 'custom-add' || order.includes(vendorSel))
+              const activeVendor = vendorSel && (vendorSel === 'custom' || vendorSel === 'custom-add' || order.includes(vendorSel))
                 ? vendorSel
                 : (selVendor ?? order.find((v) => v !== 'custom' && groups[v]?.some((o) => o.configured)) ?? order[0])
               const submitCustom = () => {
@@ -202,15 +201,9 @@ export function ModelPanel() {
               }
               const vendorModelsSrc = groups[activeVendor] ?? []
               const smOrder = savedModelOrder[activeVendor]
-              const vendorModels = smOrder
-                ? [...vendorModelsSrc].sort((a, b) => {
-                    const ia = smOrder.indexOf(a.key)
-                    const ib = smOrder.indexOf(b.key)
-                    if (ia < 0 && ib < 0) return 0
-                    if (ia < 0) return 1
-                    if (ib < 0) return -1
-                    return ia - ib
-                  })
+              const cmpByOrder = smOrder ? sortByOrder(smOrder) : null
+              const vendorModels = cmpByOrder
+                ? [...vendorModelsSrc].sort((a, b) => cmpByOrder(a.key, b.key))
                 : vendorModelsSrc
               const modelDragProps = (key: string) => ({
                 draggable: wsStatus === 'open',
@@ -264,15 +257,9 @@ export function ModelPanel() {
                 )
               }
               const csOrder = savedModelOrder['custom']
-              const sortedCustom = csOrder
-                ? [...customModels].sort((a, b) => {
-                    const ia = csOrder.indexOf(a.key)
-                    const ib = csOrder.indexOf(b.key)
-                    if (ia < 0 && ib < 0) return 0
-                    if (ia < 0) return 1
-                    if (ib < 0) return -1
-                    return ia - ib
-                  })
+              const csCmp = csOrder ? sortByOrder(csOrder) : null
+              const sortedCustom = csCmp
+                ? [...customModels].sort((a, b) => csCmp(a.key, b.key))
                 : customModels
               return (
                 <div className="model-cols">
@@ -284,7 +271,7 @@ export function ModelPanel() {
                       const isActiveVendor = v === activeVendor
                       const isCurrentVendor = selVendor === v
                       const vendorDragProps = {
-                        draggable: true as const,
+                        draggable: wsStatus === 'open',
                         onDragStart: (e: React.DragEvent) => { e.dataTransfer.effectAllowed = 'move' as const; setDragVendor(v) },
                         onDragOver: (e: React.DragEvent) => { e.preventDefault(); setDragOverVendor(v) },
                         onDrop: (e: React.DragEvent) => { e.preventDefault(); if (dragVendor) reorderVendors(order, dragVendor, v); setDragVendor(null); setDragOverVendor(null) },
@@ -299,7 +286,7 @@ export function ModelPanel() {
                           onClick={() => setVendorSel(v)}
                           {...vendorDragProps}
                         >
-                          <span className="model-vendor-name">{isCustom ? (lang === 'zh' ? '⚙ 自定义' : '⚙ Custom') : (lang === 'zh' ? VENDOR_LABELS[v]?.zh : VENDOR_LABELS[v]?.en ?? v)}</span>
+                          <span className="model-vendor-name">{isCustom ? (lang === 'zh' ? '⚙ 自定义' : '⚙ Custom') : ((lang === 'zh' ? VENDOR_LABELS[v]?.zh : VENDOR_LABELS[v]?.en) ?? v)}</span>
                           <span className="model-vendor-count">{list.length}</span>
                           {isCurrentVendor && <span className="model-vendor-dot" />}
                         </button>
