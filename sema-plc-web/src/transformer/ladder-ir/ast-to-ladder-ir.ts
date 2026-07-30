@@ -31,6 +31,9 @@ import type {
   LadderRungIR,
   ContactNetwork,
   ContactElement,
+  ComparatorElement,
+  SeriesNetwork,
+  ParallelNetwork,
   VariableInfo,
   FunctionBlockInfo,
   FunctionBlockType,
@@ -73,6 +76,7 @@ export function astToLadderIR(ast: STAST): LadderIR {
     ir.rungs.push(...rungs);
   }
 
+  ir.rungs = mergeSharedOutputs(ir.rungs);
   return ir;
 }
 
@@ -90,7 +94,76 @@ function programToLadderIR(program: STProgram): LadderIR {
     ir.rungs.push(...rungs);
   }
 
+  ir.rungs = mergeSharedOutputs(ir.rungs);
   return ir;
+}
+
+// ============================================================================
+// Shared-Condition Output Merging
+// ============================================================================
+
+/**
+ * Structural equality of two contact networks. Compares only the logical shape
+ * (types, variable names, operators) — `sourceExpr` back-references are ignored.
+ */
+export function networkEq(a: ContactNetwork, b: ContactNetwork): boolean {
+  if (a.type !== b.type) return false;
+  switch (a.type) {
+    case 'true':
+      return true;
+    case 'contact': {
+      const o = b as ContactElement;
+      return a.variable === o.variable && a.contactType === o.contactType;
+    }
+    case 'comparator': {
+      const o = b as ComparatorElement;
+      return a.operator === o.operator
+        && a.leftOperand === o.leftOperand
+        && a.rightOperand === o.rightOperand;
+    }
+    case 'series': {
+      const o = b as SeriesNetwork;
+      return a.elements.length === o.elements.length
+        && a.elements.every((e, i) => networkEq(e, o.elements[i]));
+    }
+    case 'parallel': {
+      const o = b as ParallelNetwork;
+      return a.branches.length === o.branches.length
+        && a.branches.every((e, i) => networkEq(e, o.branches[i]));
+    }
+  }
+}
+
+/**
+ * Collapse adjacent rungs that share the exact same input network into a single
+ * rung with parallel coils — what a PLC editor draws for
+ * `IF Start THEN Motor := TRUE; Lamp := TRUE; END_IF`.
+ *
+ * Only coil outputs merge: timers/counters carry their own `inputNetwork` and a
+ * shared-condition block pair is not the same diagram. Rungs are renumbered
+ * afterwards so `index` stays contiguous (it drives the rung badge and the
+ * node/edge grouping in buildDiagram).
+ */
+export function mergeSharedOutputs(rungs: LadderRungIR[]): LadderRungIR[] {
+  const merged: LadderRungIR[] = [];
+
+  for (const rung of rungs) {
+    const prev = merged[merged.length - 1];
+    const mergeable = prev
+      && rung.output.type === 'coil'
+      && (prev.output.type === 'coil' || prev.output.type === 'multi')
+      && networkEq(prev.inputNetwork, rung.inputNetwork);
+
+    if (mergeable) {
+      prev.output = prev.output.type === 'multi'
+        ? { type: 'multi', outputs: [...prev.output.outputs, rung.output] }
+        : { type: 'multi', outputs: [prev.output, rung.output] };
+      continue;
+    }
+    merged.push(rung);
+  }
+
+  return merged.map((rung, i) => ({ ...rung, index: i, id: `rung_${i}` }));
 }
 
 // ============================================================================

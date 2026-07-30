@@ -112,6 +112,17 @@ function wire(x1: number, y: number, x2: number, on: boolean) {
   )
 }
 
+function vline(x: number, y1: number, y2: number, on: boolean) {
+  return (
+    <line
+      key={nk()}
+      x1={x} y1={y1} x2={x} y2={y2}
+      stroke={on ? HOT : COLD}
+      strokeWidth={on ? 2.6 : 1.8}
+    />
+  )
+}
+
 /** A contact glyph. `pin` = power arriving at its left terminal. */
 function contactGlyph(c: ContactElement, x: number, cy: number, pin: boolean, lk: LiveLookup) {
   const passes = contactPasses(c, lk)
@@ -277,106 +288,185 @@ function outputSpecs(out: RungOutput, lk: LiveLookup): OutputSpec[] {
   }
 }
 
-// ── Rung rendering ───────────────────────────────────────────────────────────
+// ── Measurement ──────────────────────────────────────────────────────────────
 
-const W = 720
+const MIN_W = 720
 const RAIL_L = 22
-const RAIL_R = W - 22
+const STUB = 24        // stub wire each glyph draws on either side of itself
+const ROW_H = 56       // vertical pitch between parallel branch rows
+const BRANCH_PAD = 16  // gap between a branch's vertical bars and its slot edge
+const COIL_HW = 26
+const BLOCK_HW = 43 + 30
+
+type Size = { w: number; h: number }
+
+/** Natural size of one slot, including the stub wires its glyph draws. */
+function measure(el: FlatEl): Size {
+  if (el.t === 'contact') return { w: 18 + STUB * 2, h: ROW_H }
+  if (el.t === 'comparator') return { w: cmpHalfW(el.el) * 2 + STUB * 2, h: ROW_H }
+  const rows = el.branches.map(measureRow)
+  return {
+    w: Math.max(...rows.map((r) => r.w)) + BRANCH_PAD * 2,
+    h: rows.reduce((s, r) => s + r.h, 0),
+  }
+}
+
+/** Natural size of a series of slots. */
+function measureRow(row: FlatEl[]): Size {
+  if (row.length === 0) return { w: 48, h: ROW_H }
+  const ms = row.map(measure)
+  return {
+    w: ms.reduce((s, m) => s + m.w, 0),
+    h: Math.max(...ms.map((m) => m.h)),
+  }
+}
+
+function outWidth(o: OutputSpec): number {
+  return (o.t === 'coil' ? COIL_HW : BLOCK_HW) * 2
+}
+
+// ── Drawing ──────────────────────────────────────────────────────────────────
+
+/**
+ * Draw a series of slots left-to-right across [x0,x1] at height y, splitting any
+ * spare width evenly between them. Returns whether power reaches the right end.
+ */
+function drawRow(
+  row: FlatEl[], x0: number, x1: number, y: number,
+  pin: boolean, lk: LiveLookup, nodes: ReactNode[]
+): boolean {
+  if (row.length === 0) {
+    nodes.push(wire(x0, y, x1, pin))
+    return pin
+  }
+  const ms = row.map(measure)
+  const natural = ms.reduce((s, m) => s + m.w, 0)
+  const slack = Math.max(0, (x1 - x0 - natural) / row.length)
+
+  let cur = x0
+  let p = pin
+  row.forEach((el, i) => {
+    const w = ms[i].w + slack
+    p = drawEl(el, cur, cur + w, y, p, lk, nodes)
+    cur += w
+  })
+  if (cur < x1) nodes.push(wire(cur, y, x1, p))
+  return p
+}
+
+/**
+ * Draw one slot centred in [x0,x1]. A branch slot recurses back into drawRow for
+ * each of its rows, so nested parallels (and multi-element branch rows) lay out
+ * the same way a top-level series does.
+ */
+function drawEl(
+  el: FlatEl, x0: number, x1: number, y: number,
+  pin: boolean, lk: LiveLookup, nodes: ReactNode[]
+): boolean {
+  const cx = (x0 + x1) / 2
+
+  if (el.t === 'contact') {
+    const p = pin && contactPasses(el.el, lk)
+    nodes.push(wire(x0, y, cx - STUB, pin))
+    nodes.push(wire(cx + STUB, y, x1, p))
+    nodes.push(contactGlyph(el.el, cx, y, pin, lk))
+    return p
+  }
+
+  if (el.t === 'comparator') {
+    const half = cmpHalfW(el.el)
+    const p = pin && comparatorPasses(el.el, lk)
+    nodes.push(wire(x0, y, cx - half - STUB, pin))
+    nodes.push(wire(cx + half + STUB, y, x1, p))
+    nodes.push(comparatorGlyph(el.el, cx, y, pin, lk))
+    return p
+  }
+
+  // Parallel group: vertical bus bars at bx0/bx1, rows stacked around y.
+  const bx0 = x0 + BRANCH_PAD
+  const bx1 = x1 - BRANCH_PAD
+  const rows = el.branches.map(measureRow)
+  const total = rows.reduce((s, r) => s + r.h, 0)
+  let top = y - total / 2
+  let anyOut = false
+
+  const ys: number[] = []
+  el.branches.forEach((branch, i) => {
+    const ry = top + rows[i].h / 2
+    top += rows[i].h
+    ys.push(ry)
+    if (drawRow(branch, bx0, bx1, ry, pin, lk, nodes)) anyOut = true
+  })
+
+  // Each bus bar is one piece of wire: the left one sits at the incoming
+  // potential, the right one lights whole as soon as any branch conducts —
+  // never segment-by-segment per row.
+  const p = pin && anyOut
+  const yTop = Math.min(y, ...ys)
+  const yBot = Math.max(y, ...ys)
+  nodes.push(vline(bx0, yTop, yBot, pin))
+  nodes.push(vline(bx1, yTop, yBot, p))
+  nodes.push(wire(x0, y, bx0, pin))
+  nodes.push(wire(bx1, y, x1, p))
+  return p
+}
+
+/** One output: coil or FB block, wired from xFrom out to the right rail. */
+function drawOutput(
+  o: OutputSpec, xFrom: number, cx: number, railR: number, y: number,
+  pin: boolean, lk: LiveLookup, nodes: ReactNode[]
+): void {
+  if (o.t === 'coil') {
+    nodes.push(wire(xFrom, y, cx - COIL_HW, pin))
+    nodes.push(coilGlyph(o.name, o.coilType, cx, y, pin))
+    nodes.push(wire(cx + COIL_HW, y, railR, pin))
+    return
+  }
+  const hot = pin && (lk.has(o.portQ) ? truthy(lk.get(o.portQ)) : false)
+  nodes.push(wire(xFrom, y, cx - BLOCK_HW, pin))
+  nodes.push(blockGlyph(cx, y, o.title, o.rows, pin, hot))
+  nodes.push(wire(cx + BLOCK_HW, y, railR, hot))
+}
+
+/**
+ * Outputs sharing one input condition stack vertically off a single bus bar —
+ * what a PLC editor draws for `IF Start THEN Motor := TRUE; Lamp := TRUE; END_IF`.
+ */
+function drawOutputs(
+  outs: OutputSpec[], xFrom: number, railR: number, cy: number,
+  pin: boolean, lk: LiveLookup, nodes: ReactNode[]
+): void {
+  const cx = (xFrom + railR) / 2
+  if (outs.length === 1) {
+    drawOutput(outs[0], xFrom, cx, railR, cy, pin, lk, nodes)
+    return
+  }
+  const top = cy - ((outs.length - 1) * ROW_H) / 2
+  nodes.push(vline(xFrom, top, top + (outs.length - 1) * ROW_H, pin))
+  outs.forEach((o, i) => {
+    drawOutput(o, xFrom, cx, railR, top + i * ROW_H, pin, lk, nodes)
+  })
+}
+
+// ── Rung rendering ───────────────────────────────────────────────────────────
 
 function renderRung(rung: LadderRungIR, lk: LiveLookup, live: boolean) {
   const els = flattenNetwork(rung.inputNetwork)
   const outs = outputSpecs(rung.output, lk)
-  // For timer/counter outputs the IR drives the block from the timer's own
-  // inputNetwork; we already flattened rung.inputNetwork (the coil rung). For
-  // blocks, append them as right-side slots after the input contacts.
-  const inputCount = els.length
-  const slotCount = inputCount + outs.length
-  const hasBranch = els.some((e) => e.t === 'branch')
-  const H = hasBranch ? 132 : 66
-  const cy = hasBranch ? H / 2 : H / 2 + 2
-
-  // X centers across the rung interior.
-  const x0 = 100
-  const x1 = RAIL_R - 70
-  const centers: number[] =
-    slotCount <= 1 ? [110] : Array.from({ length: slotCount }, (_, i) => x0 + (x1 - x0) * (i / (slotCount - 1)))
-
   const nodes: ReactNode[] = []
-  let pin = live // left rail is hot only while running
 
-  // Distance from a slot's center to the outer end of its own stub wires.
-  const reach = (s: FlatEl): number => {
-    if (s.t === 'comparator') return cmpHalfW(s.el) + 24
-    if (s.t === 'branch') return 40 + s.branches.flat().reduce((m, b) => Math.max(m, b.t === 'comparator' ? cmpHalfW(b.el) - 39 : 0), 0)
-    return 24
-  }
+  const inSize = measureRow(els)
+  const outW = outs.length > 0 ? Math.max(...outs.map(outWidth)) : 0
+  // Widen past the default only when the content genuinely needs it; the SVG
+  // scales to fit its panel either way.
+  const W = Math.max(MIN_W, RAIL_L * 2 + inSize.w + outW + 40)
+  const railR = W - 22
+  const H = Math.max(inSize.h, outs.length * ROW_H) + 10
+  const cy = H / 2
 
-  // Input contacts / branches
-  let prevReach = 0
-  els.forEach((slot, i) => {
-    const from = i === 0 ? RAIL_L : centers[i - 1] + prevReach
-    // keep wide boxes clear of the rail / previous slot
-    const x = Math.max(centers[i], from + reach(slot) + 4)
-    centers[i] = x
-    if (slot.t === 'branch') {
-      const bw = reach(slot) // vertical bars sit at x ± bw
-      let anyOut = false
-      const rowH = 56
-      slot.branches.forEach((row, ri) => {
-        const ry = cy + (ri - (slot.branches.length - 1) / 2) * rowH
-        const rout = pin && branchConducts(row, lk)
-        // wires first, glyphs after — comparator boxes repaint over them
-        nodes.push(<line key={nk()} x1={x - bw} y1={cy} x2={x - bw} y2={ry} stroke={pin ? HOT : COLD} strokeWidth={pin ? 2.4 : 1.6} />)
-        nodes.push(<line key={nk()} x1={x + bw} y1={ry} x2={x + bw} y2={cy} stroke={rout ? HOT : COLD} strokeWidth={rout ? 2.4 : 1.6} />)
-        nodes.push(wire(x - bw, ry, x - 24, pin))
-        nodes.push(wire(x + 24, ry, x + bw, rout))
-        let rp = pin
-        // single-element branch rows (common case)
-        row.forEach((b) => {
-          if (b.t === 'contact') {
-            nodes.push(contactGlyph(b.el, x, ry, rp, lk))
-            rp = rp && contactPasses(b.el, lk)
-          } else if (b.t === 'comparator') {
-            nodes.push(comparatorGlyph(b.el, x, ry, rp, lk))
-            rp = rp && comparatorPasses(b.el, lk)
-          }
-        })
-        if (rp) anyOut = true
-      })
-      nodes.push(wire(from, cy, x - bw, pin))
-      pin = pin && anyOut
-      if (i === slotCount - 1) nodes.push(wire(x + bw, cy, RAIL_R, pin))
-    } else if (slot.t === 'contact') {
-      nodes.push(wire(from, cy, x - 24, pin))
-      nodes.push(contactGlyph(slot.el, x, cy, pin, lk))
-      pin = pin && contactPasses(slot.el, lk)
-    } else {
-      // comparator
-      nodes.push(wire(from, cy, x - reach(slot), pin))
-      nodes.push(comparatorGlyph(slot.el, x, cy, pin, lk))
-      pin = pin && comparatorPasses(slot.el, lk)
-    }
-    prevReach = reach(slot)
-  })
-
-  // Outputs (coils / blocks)
-  outs.forEach((o, j) => {
-    const i = inputCount + j
-    const x = centers[i]
-    const from = i === 0 ? RAIL_L : centers[i - 1] + prevReach
-    if (o.t === 'coil') {
-      nodes.push(wire(from, cy, x - 26, pin))
-      nodes.push(coilGlyph(o.name, o.coilType, x, cy, pin))
-      nodes.push(wire(x + 26, cy, RAIL_R, pin))
-      prevReach = 26
-    } else {
-      const hot = pin && (lk.has(o.portQ) ? truthy(lk.get(o.portQ)) : false)
-      nodes.push(wire(from, cy, x - 43 - 30, pin))
-      nodes.push(blockGlyph(x, cy, o.title, o.rows, pin, hot))
-      nodes.push(wire(x + 43 + 30, cy, RAIL_R, hot))
-      prevReach = 43 + 30
-    }
-  })
+  const xSplit = Math.max(RAIL_L + 60, railR - outW - 40)
+  const pin = drawRow(els, RAIL_L, xSplit, cy, live, lk, nodes)
+  drawOutputs(outs, xSplit, railR, cy, pin, lk, nodes)
 
   return (
     <div className="ld-rung" key={rung.id}>
@@ -386,7 +476,7 @@ function renderRung(rung: LadderRungIR, lk: LiveLookup, live: boolean) {
       </div>
       <svg viewBox={`0 0 ${W} ${H}`} className="ld-svg" preserveAspectRatio="xMidYMid meet">
         <line x1={RAIL_L} y1="6" x2={RAIL_L} y2={H - 6} stroke={RAIL} strokeWidth="3" />
-        <line x1={RAIL_R} y1="6" x2={RAIL_R} y2={H - 6} stroke={RAIL} strokeWidth="3" />
+        <line x1={railR} y1="6" x2={railR} y2={H - 6} stroke={RAIL} strokeWidth="3" />
         {nodes}
       </svg>
     </div>
@@ -395,11 +485,17 @@ function renderRung(rung: LadderRungIR, lk: LiveLookup, live: boolean) {
 
 /** A short human label for a rung when it has no comment. */
 function networkLabel(rung: LadderRungIR): string {
-  const out = rung.output
-  if (out.type === 'coil') return out.variable
-  if (out.type === 'timer') return `${out.instanceName} (${out.timerType})`
-  if (out.type === 'counter') return `${out.instanceName} (${out.counterType})`
-  return rung.id
+  return outputLabel(rung.output) || rung.id
+}
+
+function outputLabel(out: RungOutput): string {
+  switch (out.type) {
+    case 'coil': return out.variable
+    case 'timer': return `${out.instanceName} (${out.timerType})`
+    case 'counter': return `${out.instanceName} (${out.counterType})`
+    case 'multi': return out.outputs.map(outputLabel).filter(Boolean).join(', ')
+    default: return ''
+  }
 }
 
 // ── Top-level view ─────────────────────────────────────────────────────────
