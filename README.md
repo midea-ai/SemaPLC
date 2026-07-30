@@ -88,8 +88,8 @@ See [`sema-plc-tools/README.md`](sema-plc-tools/README.md) for the full command 
 
 ```bash
 # 1. Clone
-git clone <this-repo-url> sema-plc
-cd sema-plc
+git clone https://github.com/midea-ai/SemaPLC.git
+cd SemaPLC
 
 # 2. Build the toolchain (the web app direct-imports its dist/)
 cd sema-plc-tools && npm install && npm run build && cd ..
@@ -151,8 +151,8 @@ Open **<http://localhost:5173>** and describe a control requirement in the chat 
 ## 🧪 Tests
 
 ```bash
-cd sema-plc-tools && npm test     # 542 tests (no Docker needed)
-cd sema-plc-web   && npm test     # 224 tests (server: vitest/node, frontend: vitest/jsdom)
+cd sema-plc-tools && npm test     # no Docker needed
+cd sema-plc-web   && npm test     # server: vitest/node, frontend: vitest/jsdom
 ```
 
 ## 🤝 Acknowledgments
