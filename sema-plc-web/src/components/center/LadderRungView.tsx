@@ -131,20 +131,31 @@ function contactGlyph(c: ContactElement, x: number, cy: number, pin: boolean, lk
   )
 }
 
+const CMP_OP_SYM: Record<string, string> = { EQ: '=', NE: '<>', GT: '>', GE: '>=', LT: '<', LE: '<=' }
+
+function cmpLabel(c: ComparatorElement): string {
+  return `${c.leftOperand} ${CMP_OP_SYM[c.operator] ?? c.operator} ${c.rightOperand}`
+}
+
+/** Half-width of the comparator box, sized to fit its label.
+ *  ponytail: 6.6px/char estimate for 11px mono (.ld-name), not real text measuring. */
+function cmpHalfW(c: ComparatorElement): number {
+  return Math.max(39, Math.ceil((cmpLabel(c).length * 6.6) / 2) + 10)
+}
+
 function comparatorGlyph(c: ComparatorElement, x: number, cy: number, pin: boolean, lk: LiveLookup) {
   const passes = comparatorPasses(c, lk)
   const hot = pin && passes
   const col = hot ? HOT : COLD
-  const w = 78
+  const w = cmpHalfW(c) * 2
   const left = x - w / 2
-  const opSym: Record<string, string> = { EQ: '=', NE: '<>', GT: '>', GE: '>=', LT: '<', LE: '<=' }
   return (
     <g key={nk()}>
       {wire(left - 24, cy, left, pin)}
       {wire(left + w, cy, left + w + 24, hot)}
       <rect x={left} y={cy - 14} width={w} height={28} rx="5" fill="#fff" stroke={col} strokeWidth={hot ? 2.2 : 1.6} />
       <text x={x} y={cy + 4} textAnchor="middle" className="ld-name">
-        {c.leftOperand} {opSym[c.operator] ?? c.operator} {c.rightOperand}
+        {cmpLabel(c)}
       </text>
     </g>
   )
@@ -293,15 +304,32 @@ function renderRung(rung: LadderRungIR, lk: LiveLookup, live: boolean) {
   const nodes: ReactNode[] = []
   let pin = live // left rail is hot only while running
 
+  // Distance from a slot's center to the outer end of its own stub wires.
+  const reach = (s: FlatEl): number => {
+    if (s.t === 'comparator') return cmpHalfW(s.el) + 24
+    if (s.t === 'branch') return 40 + s.branches.flat().reduce((m, b) => Math.max(m, b.t === 'comparator' ? cmpHalfW(b.el) - 39 : 0), 0)
+    return 24
+  }
+
   // Input contacts / branches
+  let prevReach = 0
   els.forEach((slot, i) => {
-    const x = centers[i]
-    const prevX = i === 0 ? RAIL_L : centers[i - 1]
+    const from = i === 0 ? RAIL_L : centers[i - 1] + prevReach
+    // keep wide boxes clear of the rail / previous slot
+    const x = Math.max(centers[i], from + reach(slot) + 4)
+    centers[i] = x
     if (slot.t === 'branch') {
-      const rowH = 56
+      const bw = reach(slot) // vertical bars sit at x ± bw
       let anyOut = false
+      const rowH = 56
       slot.branches.forEach((row, ri) => {
         const ry = cy + (ri - (slot.branches.length - 1) / 2) * rowH
+        const rout = pin && branchConducts(row, lk)
+        // wires first, glyphs after — comparator boxes repaint over them
+        nodes.push(<line key={nk()} x1={x - bw} y1={cy} x2={x - bw} y2={ry} stroke={pin ? HOT : COLD} strokeWidth={pin ? 2.4 : 1.6} />)
+        nodes.push(<line key={nk()} x1={x + bw} y1={ry} x2={x + bw} y2={cy} stroke={rout ? HOT : COLD} strokeWidth={rout ? 2.4 : 1.6} />)
+        nodes.push(wire(x - bw, ry, x - 24, pin))
+        nodes.push(wire(x + 24, ry, x + bw, rout))
         let rp = pin
         // single-element branch rows (common case)
         row.forEach((b) => {
@@ -314,40 +342,39 @@ function renderRung(rung: LadderRungIR, lk: LiveLookup, live: boolean) {
           }
         })
         if (rp) anyOut = true
-        nodes.push(<line key={nk()} x1={x - 40} y1={cy} x2={x - 40} y2={ry} stroke={pin ? HOT : COLD} strokeWidth={pin ? 2.4 : 1.6} />)
-        nodes.push(<line key={nk()} x1={x + 40} y1={ry} x2={x + 40} y2={cy} stroke={rp ? HOT : COLD} strokeWidth={rp ? 2.4 : 1.6} />)
-        nodes.push(wire(x - 40, ry, x - 24, pin))
-        nodes.push(wire(x + 24, ry, x + 40, rp))
       })
-      nodes.push(wire(prevX === RAIL_L ? RAIL_L : prevX + 24, cy, x - 40, pin))
+      nodes.push(wire(from, cy, x - bw, pin))
       pin = pin && anyOut
-      nodes.push(wire(x + 40, cy, i === slotCount - 1 ? RAIL_R : centers[i + 1] - 24, pin))
+      if (i === slotCount - 1) nodes.push(wire(x + bw, cy, RAIL_R, pin))
     } else if (slot.t === 'contact') {
-      nodes.push(wire(prevX === RAIL_L ? RAIL_L : prevX + 24, cy, x - 24, pin))
+      nodes.push(wire(from, cy, x - 24, pin))
       nodes.push(contactGlyph(slot.el, x, cy, pin, lk))
       pin = pin && contactPasses(slot.el, lk)
     } else {
       // comparator
-      nodes.push(wire(prevX === RAIL_L ? RAIL_L : prevX + 24, cy, x - 39, pin))
+      nodes.push(wire(from, cy, x - reach(slot), pin))
       nodes.push(comparatorGlyph(slot.el, x, cy, pin, lk))
       pin = pin && comparatorPasses(slot.el, lk)
     }
+    prevReach = reach(slot)
   })
 
   // Outputs (coils / blocks)
   outs.forEach((o, j) => {
     const i = inputCount + j
     const x = centers[i]
-    const prevX = i === 0 ? RAIL_L : centers[i - 1]
+    const from = i === 0 ? RAIL_L : centers[i - 1] + prevReach
     if (o.t === 'coil') {
-      nodes.push(wire(prevX === RAIL_L ? RAIL_L : prevX + 26, cy, x - 26, pin))
+      nodes.push(wire(from, cy, x - 26, pin))
       nodes.push(coilGlyph(o.name, o.coilType, x, cy, pin))
       nodes.push(wire(x + 26, cy, RAIL_R, pin))
+      prevReach = 26
     } else {
       const hot = pin && (lk.has(o.portQ) ? truthy(lk.get(o.portQ)) : false)
-      nodes.push(wire(prevX === RAIL_L ? RAIL_L : prevX + 26, cy, x - 43 - 30, pin))
+      nodes.push(wire(from, cy, x - 43 - 30, pin))
       nodes.push(blockGlyph(x, cy, o.title, o.rows, pin, hot))
       nodes.push(wire(x + 43 + 30, cy, RAIL_R, hot))
+      prevReach = 43 + 30
     }
   })
 
