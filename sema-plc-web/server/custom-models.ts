@@ -1,5 +1,6 @@
 import * as fs from 'fs'
 import * as path from 'path'
+import { dataDir } from './data-dir.js'
 
 // 用户自定义模型列表(多条,可增删切换)。持久化到仓库根的 custom-models.json,
 // 与 .env 并列、已在 .gitignore。首次加载时若文件不存在,则从旧的单槽
@@ -12,7 +13,8 @@ export type CustomModelEntry = {
   adapt: 'openai' | 'anthropic'
 }
 
-const FILE = path.join(process.cwd(), 'custom-models.json')
+// 惰性求值:SEMAPLC_DATA_DIR 可能在模块 import 之后才设(测试/扩展注入)。
+const FILE = () => path.join(dataDir(), 'custom-models.json')
 let cache: CustomModelEntry[] | null = null
 
 function genId(existing: CustomModelEntry[]): string {
@@ -39,13 +41,13 @@ function seedFromEnv(env: NodeJS.ProcessEnv): CustomModelEntry | null {
 }
 
 function save(list: CustomModelEntry[]): void {
-  try { fs.writeFileSync(FILE, JSON.stringify(list, null, 2) + '\n', 'utf8') } catch {}
+  try { fs.writeFileSync(FILE(), JSON.stringify(list, null, 2) + '\n', 'utf8') } catch {}
 }
 
 function load(env: NodeJS.ProcessEnv): CustomModelEntry[] {
-  if (fs.existsSync(FILE)) {
+  if (fs.existsSync(FILE())) {
     try {
-      const arr = JSON.parse(fs.readFileSync(FILE, 'utf8'))
+      const arr = JSON.parse(fs.readFileSync(FILE(), 'utf8'))
       if (Array.isArray(arr)) return arr.filter(isEntry)
     } catch {}
     return []

@@ -190,6 +190,33 @@ export function writeStFile(filePath: string, content: string): void {
   fs.writeFileSync(fp, content, 'utf8')
 }
 
+// 只有这两个系统垃圾文件不算"有内容"。别的一律算 —— .git/node_modules 尤其要算。
+const IGNORED_ENTRIES = new Set(['.DS_Store', 'Thumbs.db'])
+
+/**
+ * 目标目录能否安全地当工作区。放行 = 返回 null,否则返回拒绝原因(直接给用户看)。
+ *
+ * 只放行三种:不存在(将新建)、空目录、已经是 PLC 工作区(有 .sema/.mcp.json)。
+ * 有内容的普通目录一律拒绝 —— 认领之后 setupWorkspaceIfNeeded() 会往里铺
+ * AGENTS.md/.sema/config/,而「重置」会走 cleanWorkspace() 把顶层条目全部 rm -rf。
+ * 把用户的代码仓库切成工作区 = 两次点击删库(.git 和未提交改动一起没)。
+ *
+ * 守卫必须在切换入口,不能挪到 cleanWorkspace:一旦切过去,模板就把 .sema/.mcp.json
+ * 铺出来了,那时再判"是不是 PLC 工作区"永远为真。
+ */
+export function checkWorkspaceTarget(dir: string): string | null {
+  const ws = safePath(dir)
+  if (!fs.existsSync(ws)) return null // 新建
+  if (!fs.statSync(ws).isDirectory()) return `${ws} 不是目录`
+  if (fs.existsSync(safePath(path.join(ws, '.sema', '.mcp.json'), ws))) return null // 已是工作区
+  if (fs.readdirSync(ws).every((n) => IGNORED_ENTRIES.has(n))) return null // 空目录
+  return (
+    `${ws} 既不是空目录,也不是 PLC 工作区(没有 .sema/.mcp.json)。` +
+    `切换过去会往其中写入模板文件,之后点「重置」会删光该目录下的所有内容。` +
+    `请换一个空目录,或选一个此前用 SemaPLC 建过工程的目录。`
+  )
+}
+
 /**
  * Remove all files and directories inside the workspace so
  * setupWorkspaceIfNeeded() can re-copy from templates/.

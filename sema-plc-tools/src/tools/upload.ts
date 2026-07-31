@@ -34,7 +34,7 @@ export async function handleUpload(
   if (!fs.existsSync(localZipPath) && cfg.container) {
     tmpZipPath = path.join(os.tmpdir(), `plc_upload_${Date.now()}.zip`)
     try {
-      await execFileAsync('docker', ['cp', `${cfg.container}:${localZipPath}`, tmpZipPath])
+      await execFileAsync(cfg.dockerBin, ['cp', `${cfg.container}:${localZipPath}`, tmpZipPath])
       localZipPath = tmpZipPath
     } catch (e) {
       return {

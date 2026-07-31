@@ -205,7 +205,7 @@ async function poolCompileOnce(stCode: string, inst0: Instance): Promise<Compile
   if (fs.existsSync(zipPath)) return { ok: true, zipBuffer: fs.readFileSync(zipPath), expectedMd5 }   // host 侧已有
   const tmp = path.join(os.tmpdir(), `plc-pool-${process.pid}-${Date.now()}.zip`)
   try {
-    await execFileAsync('docker', ['cp', `${inst0.cfg.container}:${zipPath}`, tmp])
+    await execFileAsync(inst0.cfg.dockerBin, ['cp', `${inst0.cfg.container}:${zipPath}`, tmp])
     return { ok: true, zipBuffer: fs.readFileSync(tmp), expectedMd5 }
   } catch (e) {
     return { ok: false, failStage: 'compile', detail: `docker cp zip 失败(${inst0.cfg.container}:${zipPath}): ${e}` }

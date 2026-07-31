@@ -22,6 +22,10 @@ const STICKY_TYPES = new Set<ServerMessage['type']>([
   'agent:usage',
   'scene:ready',
   'model:config',
+  // 重连(server 重启/窗口 reload/扩展 reload)后客户端 forced 集会清空,而运行时里
+  // 的强制仍然生效 ⇒ 用户再也解不掉。它是增量事件,直接 sticky 只能恢复最后一次操作,
+  // 所以这里存的是累积出来的等价快照,见 dispatch。
+  'plc:force-result',
 ])
 
 export class WsGateway {
@@ -132,9 +136,22 @@ export class WsGateway {
       const sm = m as ServerMessage
       // Cache sticky state for late-joining clients.
       if (STICKY_TYPES.has(sm.type)) {
-        // workspace:switching invalidates workspace:ready and the snapshot
-        if (sm.type === 'workspace:ready') {
-          this.sticky.set('workspace:ready', sm)
+        // 存快照而不是原事件:前端 applyForceResult 本身是并集语义(加 forced、减
+        // released),把历次增量累积成一条 forced=全集 的等价消息重放即可完整恢复,
+        // 前端不用改。广播出去的仍是原始增量 sm。
+        // ponytail: 天花板两档,都得改别处才能修,这里只做累积。
+        // 一、server 进程重启会丢这份累积——runtime 没有「列出已强制」的查询,
+        //     真要覆盖得持久化或给 runtime 加接口。
+        // 二、Run / 重新构建会让运行时里的强制失效,但 sticky 和前端 store 都不会清,
+        //     重连的客户端会看到已经不存在的强制。这是既有行为(在线客户端本来也不清),
+        //     累积快照只是让重连后一样错,不算回归;要修得让 plc-controller 在 buildAndRun
+        //     之后 emit 一条 released=全集。
+        if (sm.type === 'plc:force-result') {
+          const prev = this.sticky.get('plc:force-result') as typeof sm | undefined
+          const names = new Set(prev?.forced ?? [])
+          for (const n of sm.forced) names.add(n)
+          for (const n of sm.released) names.delete(n)
+          this.sticky.set(sm.type, { type: 'plc:force-result', forced: [...names], released: [], failed: [], error: null })
         } else {
           this.sticky.set(sm.type, sm)
         }

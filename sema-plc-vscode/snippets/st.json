@@ -1,0 +1,47 @@
+{
+  "IF-THEN-END_IF": {
+    "prefix": "if",
+    "body": ["IF ${1:condition} THEN", "\t$0", "END_IF;"],
+    "description": "条件块:condition 为 TRUE 时执行"
+  },
+  "IF-THEN-ELSE-END_IF": {
+    "prefix": "ifelse",
+    "body": ["IF ${1:condition} THEN", "\t$2", "ELSE", "\t$0", "END_IF;"],
+    "description": "条件块带 ELSE 分支"
+  },
+  "CASE-OF-END_CASE": {
+    "prefix": "case",
+    "body": ["CASE ${1:expression} OF", "\t0:", "\t\t$2", "\t1:", "\t\t$0", "END_CASE;"],
+    "description": "多路分支:按表达式取值选择。分支标号支持整数区间(如 1..5)"
+  },
+  "FOR-DO-END_FOR": {
+    "prefix": "for",
+    "body": ["FOR ${1:i} := ${2:0} TO ${3:10} DO", "\t$0", "END_FOR;"],
+    "description": "计数循环。步长用 BY 子句"
+  },
+  "WHILE-DO-END_WHILE": {
+    "prefix": "while",
+    "body": ["WHILE ${1:condition} DO", "\t$0", "END_WHILE;"],
+    "description": "前测循环:condition 为 TRUE 时重复,可能一次都不执行"
+  },
+  "REPEAT-UNTIL-END_REPEAT": {
+    "prefix": "repeat",
+    "body": ["REPEAT", "\t$1", "UNTIL ${2:condition}", "END_REPEAT;"],
+    "description": "后测循环:直到 condition 为 TRUE 才停,至少执行一次"
+  },
+  "VAR-END_VAR": {
+    "prefix": "var",
+    "body": ["VAR", "\t${1:name} : ${2:BOOL};", "END_VAR"],
+    "description": "局部变量声明段"
+  },
+  "TON-timer": {
+    "prefix": "ton",
+    "body": ["${1:TimerName}(IN := ${2:condition}, PT := T#${3:5}s);"],
+    "description": "延时接通定时器:IN 保持 TRUE 达 PT 后 Q 变 TRUE"
+  },
+  "CTU-counter": {
+    "prefix": "ctu",
+    "body": ["${1:CounterName}(CU := ${2:countInput}, R := ${3:reset}, PV := ${4:10});"],
+    "description": "加计数器:CU 上升沿 CV 加一,CV >= PV 时 Q 为 TRUE"
+  }
+}

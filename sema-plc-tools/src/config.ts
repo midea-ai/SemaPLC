@@ -18,6 +18,8 @@ export interface PlcConfig {
   // PLC_POOL_SIZE — verify 工况并行池大小。1(默认)= 串行,走今天的 runVerify;
   // >1 = parallel 分支,工况扇到 #1..#(N-1) 实例(#0 留交互)。实例解析在 verify/pool.ts。
   poolSize: number
+  // PLC_DOCKER_BIN — docker 可执行文件替代(podman / colima 等),缺省 'docker'。
+  dockerBin: string
 }
 
 // PLC_POOL_SIZE → [1, 16] 整数;非法/缺省 → 1(串行)。
@@ -40,6 +42,18 @@ function safeContainerName(raw: string | undefined): string {
   return name
 }
 
+// 同 safeContainerName 的思路:docker 可执行文件名/路径在进入 execFile 前先过白名单,
+// 拒绝 [A-Za-z0-9._/-] 之外的字符(防注入)。
+const DOCKER_BIN_RE = /^[A-Za-z0-9._/-]+$/
+// 未走 loadConfig 的调用点(compiler.ts / compile.ts 等只拿到 container 字符串)直接用它。
+export function dockerBin(): string {
+  const bin = process.env.PLC_DOCKER_BIN || 'docker'
+  if (!DOCKER_BIN_RE.test(bin)) {
+    throw new Error(`Invalid PLC_DOCKER_BIN '${bin}': must match ${DOCKER_BIN_RE}`)
+  }
+  return bin
+}
+
 export function loadConfig(): PlcConfig {
   const rawPort = process.env.PLC_MODBUS_PORT
   const parsedPort = rawPort ? parseInt(rawPort, 10) : NaN
@@ -56,5 +70,6 @@ export function loadConfig(): PlcConfig {
     workspace: process.env.PLC_WORKSPACE,
     modbusPort: Number.isFinite(parsedPort) ? parsedPort : null,
     poolSize: clampPoolSize(process.env.PLC_POOL_SIZE),
+    dockerBin: dockerBin(),
   }
 }

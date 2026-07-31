@@ -41,6 +41,8 @@ related-benchmarks/
 *.png
 # 但 README logo 等需入库
 !docs/images/*
+# VSCode 插件图标(package.json 的 icon 字段指向它,缺了 vsce package 会失败)
+!sema-plc-vscode/images/*
 
 # 草稿 / 临时仿真文件
 **/.review-design.md

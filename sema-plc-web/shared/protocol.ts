@@ -166,7 +166,11 @@ export type ServerMessage =
   // 当前 turn 快照——新客户端连接时由 bridge 应答广播（不进 sticky，见 ws-gateway/sema-bridge）
   | { type: 'agent:turn-snapshot'; turn: SerializedTurn | null }
   // plc
-  | { type: 'plc:state'; status: PlcStatus }
+  // status='ERROR' 是二义的:runtime 不可达(容器没起)和编译/装载失败都是它。
+  // reachable=false 专指前者,消费端据此区分「PLC 离线」与「编译错误」。
+  // 只有轮询的 plc-monitor 知道可达性,plc-controller/bridge 的 emit 不带该字段
+  // ⇒ 约定 undefined 按 true 处理(那几处 emit 时链路必然已通)。
+  | { type: 'plc:state'; status: PlcStatus; reachable?: boolean }
   | { type: 'plc:variables'; map: VariableEntry[] }
   | { type: 'plc:values'; values: Record<string, VariableValue> }
   | { type: 'plc:runtime-error'; errors: RuntimeError[] }

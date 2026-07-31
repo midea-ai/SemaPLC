@@ -3,7 +3,12 @@ import { useEditorStore } from '../../store/editor'
 import { useLogsStore } from '../../store/logs'
 import { useWsConnection } from '../../ws/useWsConnection'
 import { useT } from '../../i18n'
+import { confirmDialog, vscodeApi } from '../../lib/confirmDialog'
+import { stripConfigurationBlock } from '../../lang/st-source'
 import { CodeEditor } from './CodeEditor'
+
+// 页面/面板被隐藏时暂存未保存草稿的键(见下方 visibilitychange)
+const DRAFT_KEY = 'semaplc:draft'
 
 const langOf = (path: string) => {
   const ext = path.split('.').pop()?.toLowerCase()
@@ -95,6 +100,7 @@ export function CodeView({ defaultTreeOpen = true }: { defaultTreeOpen?: boolean
   const currentPath = useEditorStore((s) => s.currentPath)
   const stCode = useEditorStore((s) => s.stCode)
   const isDirty = useEditorStore((s) => s.isDirty)
+  const diskContent = useEditorStore((s) => s.diskContent)
   const diskChanged = useEditorStore((s) => s.diskChanged)
   const setStCode = useEditorStore((s) => s.setStCode)
   const refresh = useEditorStore((s) => s.refresh)
@@ -114,12 +120,37 @@ export function CodeView({ defaultTreeOpen = true }: { defaultTreeOpen?: boolean
     : isDirty ? { text: t('code.rev.draft'), cls: 'draft', tip: t('code.unsaved') }
     : { text: t('code.rev.saved'), cls: '', tip: '' }
 
-  // 未保存草稿时,关/刷新整页给浏览器原生确认
+  // 未保存草稿时,关/刷新整页给浏览器原生确认。
+  // webview 面板隐藏/销毁不走 beforeunload,只有 visibilitychange 可靠 → 一并挂上:
+  // 那里拦不住关闭,能做的是把草稿暂存起来,重建后自动恢复(不落盘,免得静默改用户的文件)。
   useEffect(() => {
     const handler = (e: BeforeUnloadEvent) => { if (isDirty) { e.preventDefault(); e.returnValue = '' } }
+    const onHidden = () => {
+      if (document.visibilityState !== 'hidden') return
+      try {
+        if (isDirty && currentPath) sessionStorage.setItem(DRAFT_KEY, JSON.stringify({ path: currentPath, stCode, disk: diskContent }))
+        else sessionStorage.removeItem(DRAFT_KEY)
+      } catch {}
+    }
     window.addEventListener('beforeunload', handler)
-    return () => window.removeEventListener('beforeunload', handler)
-  }, [isDirty])
+    document.addEventListener('visibilitychange', onHidden)
+    return () => {
+      window.removeEventListener('beforeunload', handler)
+      document.removeEventListener('visibilitychange', onHidden)
+    }
+  }, [isDirty, currentPath, stCode, diskContent])
+
+  // 恢复上面暂存的草稿:仅当当前打开的还是同一文件、且磁盘内容没被改过
+  useEffect(() => {
+    if (!currentPath || isDirty) return
+    try {
+      const raw = sessionStorage.getItem(DRAFT_KEY)
+      if (!raw) return
+      const d = JSON.parse(raw)
+      sessionStorage.removeItem(DRAFT_KEY)
+      if (d?.path === currentPath && d.disk === diskContent && d.stCode !== diskContent) setStCode(d.stCode)
+    } catch {}
+  }, [currentPath, diskContent])
 
   // 当前文件被(Agent)打开时,自动展开其所在目录
   useEffect(() => {
@@ -131,9 +162,17 @@ export function CodeView({ defaultTreeOpen = true }: { defaultTreeOpen?: boolean
   const onToggleDir = (p: string) =>
     setCollapsed((prev) => { const next = new Set(prev); next.has(p) ? next.delete(p) : next.add(p); return next })
 
-  const onSelectFile = (p: string) => {
-    if (p === currentPath) return
-    if (isDirty && !window.confirm(t('code.confirm.discardSwitch'))) return
+  const onSelectFile = async (p: string) => {
+    const same = p === currentPath
+    if (!same && isDirty && !(await confirmDialog(t('code.confirm.discardSwitch')))) return
+    // 插件版顺手在原生 tab 里也开一份:诊断、大纲、F12、折叠全挂在 TextDocument 上,
+    // 只在 webview 的 CodeMirror 里打开 = 这些能力对面板用户永远不可达(存盘走 editor:save
+    // 直接落磁盘,onDidSaveTextDocument 根本不触发)。web 版没有这个 api,自动跳过。
+    // 点的就是当前文件时也要发:用户可能刚把那个原生 tab 关掉,再点一次就是想让它回来,
+    // 早退到这行之前会让这次点击彻底没反应。
+    vscodeApi()?.postMessage({ type: 'semaplc:open-file', path: p })
+    // 反过来 editor:open 可以省:store 里的 currentPath/stCode 一个字都不会变。
+    if (same) return
     send({ type: 'editor:open', path: p })
   }
 
@@ -147,13 +186,20 @@ export function CodeView({ defaultTreeOpen = true }: { defaultTreeOpen?: boolean
     setChecking(true)
     appendLog({ ts: Date.now(), source: 'tool', level: 'info', message: '→ plc_check (rusty)' })
     try {
-      const r = await fetch('/api/check', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ stCode }) })
+      // CONFIGURATION 段先剥掉再送检:rusty --check 只认 POU,原样送过去每个 CONFIGURATION
+      // 都变成一串 "expected StartKeyword but found CONFIGURATION"(traffic_light.st 实测 21 条)。
+      const r = await fetch((window.__SEMAPLC__?.httpBase ?? '') + '/api/check', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ stCode: stripConfigurationBlock(stCode) }) })
       const j = await r.json()
+      // 三态由 server 定(见 routes/check.ts 的 summarizeCheck):stdlib 报错在那边就滤掉了,
+      // 判据用的是 server 自己的 checkStdlibDir,前端再猜一遍只会猜错。
+      // 未知 outcome(老 server)落到最后一支:摊明细总比假报「通过」强。
       if (j.errorMessage) appendLog({ ts: Date.now(), source: 'tool', level: 'error', message: `✗ plc_check: ${j.errorMessage}` })
-      else if (j.ok) appendLog({ ts: Date.now(), source: 'tool', level: 'info', message: '✓ plc_check: rusty check passed' })
+      else if (j.outcome === 'passed') appendLog({ ts: Date.now(), source: 'tool', level: 'info', message: '✓ plc_check: rusty check passed' })
+      else if (j.outcome === 'truncated') appendLog({ ts: Date.now(), source: 'tool', level: 'info', message: 'ℹ plc_check: no user-code problems found (checker exited early on stdlib; later stages not checked)' })
       else {
-        appendLog({ ts: Date.now(), source: 'tool', level: 'error', message: `✗ plc_check: ${j.errors?.length ?? 0} error(s)` })
-        for (const e of (j.errors ?? [])) {
+        const errors = j.errors ?? []
+        appendLog({ ts: Date.now(), source: 'tool', level: 'error', message: `✗ plc_check: ${errors.length} error(s)` })
+        for (const e of errors) {
           const loc = e.line != null ? ` (line ${e.line}${e.col != null ? `:${e.col}` : ''})` : ''
           appendLog({ ts: Date.now(), source: 'tool', level: 'error', message: `  ${e.code}${loc} ${e.message}` })
         }

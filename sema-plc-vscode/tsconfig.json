@@ -1,0 +1,21 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    // Preserve + Bundler:与 esbuild 的实际解析行为一致(esbuild 才是真正的构建,这里只 noEmit 做类型检查)。
+    // Node16 会挡住跨包 import ../sema-plc-web/src/**:TS1479(CJS 引 ESM)+ TS2835(要求显式扩展名,
+    // 而 web 包全仓用无扩展名相对 import)。实测那套配置下探针有 26 个错。
+    "module": "Preserve",
+    "moduleResolution": "Bundler",
+    "lib": ["ES2022"],
+    "outDir": "./dist",
+    // 不设 rootDir:它会让跨包 import 触发 TS6059。noEmit 下 rootDir 本就无实际作用。
+    // include 保持只有 src/**,让 tsc 顺着 import 自己去拉需要的跨包文件 ——
+    // 放宽 include 反而会主动拉进 st-language.ts 这类依赖 DOM 的文件,引发 TS2584。
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "sourceMap": true,
+    "noEmit": true
+  },
+  "include": ["src/**/*"]
+}

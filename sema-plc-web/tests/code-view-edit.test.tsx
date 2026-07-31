@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, fireEvent, cleanup, act } from '@testing-library/react'
+import { render, screen, fireEvent, cleanup, act, waitFor } from '@testing-library/react'
 import { useEditorStore } from '../src/store/editor'
 import { useLangStore } from '../src/i18n'
 
@@ -74,12 +74,29 @@ describe('CodeView 编辑工具栏', () => {
     cleanup()
   })
 
-  it('脏时切文件确认:确认则发 editor:open', () => {
+  // 面板隐藏(webview 被销毁)→ 草稿进 sessionStorage,重建后自动恢复
+  it('visibilitychange hidden 暂存草稿,重新挂载恢复', () => {
+    useEditorStore.getState().setStCode('draft')
+    render(<CodeView />)
+    Object.defineProperty(document, 'visibilityState', { value: 'hidden', configurable: true })
+    act(() => { document.dispatchEvent(new Event('visibilitychange')) })
+    expect(sessionStorage.getItem('semaplc:draft')).toContain('draft')
+
+    cleanup()
+    useEditorStore.getState().openFile('a.st', 'A') // 重建:草稿丢了,磁盘内容未变
+    render(<CodeView />)
+    expect(useEditorStore.getState().stCode).toBe('draft')
+    expect(sessionStorage.getItem('semaplc:draft')).toBe(null)
+    Object.defineProperty(document, 'visibilityState', { value: 'visible', configurable: true })
+  })
+
+  // confirmDialog 是异步的(webview 下要等扩展回消息),web 下走 window.confirm 但仍隔一个微任务
+  it('脏时切文件确认:确认则发 editor:open', async () => {
     useEditorStore.getState().setStCode('draft')
     const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true)
     render(<CodeView />)
     fireEvent.click(screen.getByText('b.st'))
-    expect(send).toHaveBeenCalledWith({ type: 'editor:open', path: 'b.st' })
+    await waitFor(() => expect(send).toHaveBeenCalledWith({ type: 'editor:open', path: 'b.st' }))
     confirmSpy.mockRestore()
     cleanup()
   })

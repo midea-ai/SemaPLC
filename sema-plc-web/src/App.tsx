@@ -9,7 +9,8 @@ import { ArtifactCanvas } from './components/layout/ArtifactCanvas'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { useT } from './i18n'
 
-initWsClient(`ws://${window.location.hostname}:3002`)
+// 插件版由 webview 注入 __SEMAPLC__(端口是扩展分配的);web 版仍连默认 3002
+initWsClient(window.__SEMAPLC__?.wsUrl ?? `ws://${window.location.hostname}:3002`)
 wireStoresToWs()
 
 export type LayoutMode = 'split' | 'columns'

@@ -1,6 +1,6 @@
 import { SemaCore } from 'sema-core'
 import { bus } from './event-bus.js'
-import { setupWorkspaceIfNeeded, scanStFiles, scanProjectFiles, isProjectFile, readStFile, writeStFile } from './workspace-setup.js'
+import { setupWorkspaceIfNeeded, scanStFiles, scanProjectFiles, isProjectFile, readStFile, writeStFile, checkWorkspaceTarget } from './workspace-setup.js'
 import { readPlcState, plcStateFileForWorkspace } from './state-reader.js'
 import { BlockMapper } from './block-mapper.js'
 import { validateSceneSpec } from '../../sema-plc-tools/dist/tools/sceneSpec.js'
@@ -731,6 +731,14 @@ export class SemaBridge {
   }
 
   private async switchWorkspace(newPath: string): Promise<void> {
+    const target = path.resolve(newPath)
+    // 守卫必须在 workspace:switching 之前:那条广播一发,前端就清空 store 并把顶栏锁进
+    // switching 态,而这里根本不打算切过去。
+    const rejected = checkWorkspaceTarget(target)
+    if (rejected) {
+      this.emitLog('system', 'error', `切换工作区被拒绝:${rejected}`)
+      return
+    }
     bus.emit({ type: 'workspace:switching' })
     try {
       if (this.session) { try { this.core?.closeSession(this.session.sessionId) } catch {}; this.session = null }; await this.core?.dispose()
@@ -747,7 +755,7 @@ export class SemaBridge {
     this.mapper = null
     this.sessionId = null
     this.currentStPath = null
-    this.workspace = path.resolve(newPath)
+    this.workspace = target
     await this.start()
   }
 

@@ -4,6 +4,7 @@ import { usePlcStore } from '../../store/plc'
 import { useEditorStore } from '../../store/editor'
 import { useWsConnection } from '../../ws/useWsConnection'
 import { useT, useLang, setLang } from '../../i18n'
+import { confirmDialog } from '../../lib/confirmDialog'
 import { ModelPanel } from './ModelPanel'
 import { readTheme, applyTheme, type Theme } from '../../theme'
 import type { LayoutMode } from '../../App'
@@ -120,8 +121,10 @@ export function TopBar({ layout, onToggleLayout }: { layout: LayoutMode; onToggl
           <button
             className="tb-btn reset"
             disabled={switching || wsStatus !== 'open'}
-            onClick={() => {
-              if (window.confirm(t('topbar.reset.confirm'))) {
+            onClick={async () => {
+              // 路径必须进确认框:重置删的是整个工作区目录,只说"会被删除"而不说删哪个,
+              // 用户没法判断自己点的是不是删库。
+              if (await confirmDialog(`${t('topbar.reset.confirm')}\n\n${workspace ?? '—'}`)) {
                 send({ type: 'session:reset' })
               }
             }}

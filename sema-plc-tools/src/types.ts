@@ -3,6 +3,11 @@
 export interface Iec2cError {
   line: number
   col: number
+  // matiec 报的是闭区间 `line:col-endLine:endCol`,末列**含在** token 内(caret 行的
+  // `^~~~` 正好覆盖到它)。转 VSCode Range 这类半开区间时 endCol 要 +1。
+  // 老输出没有这两个字段,消费方要按缺省处理(退化成 col 处的一个点)。
+  endLine?: number
+  endCol?: number
   message: string
   severity: 'error' | 'warning'
   sourceLine: string   // raw ST source text at `line` (1-based); '' if out of range/unavailable
@@ -372,6 +377,9 @@ export interface RustyError {
   message: string
   line: number | null
   col: number | null
+  // 出错文件在容器内的路径。一次 check 同时送检 stdlib,不带路径就没法把 stdlib 的错
+  // 和用户代码的错分开(见 rustyErrorParser)。无 codespan 位置行时缺省。
+  file?: string
 }
 
 export interface CheckInput {

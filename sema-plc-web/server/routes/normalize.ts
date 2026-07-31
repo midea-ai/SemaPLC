@@ -14,6 +14,16 @@ function safeContainerName(raw: string | undefined): string {
   return name
 }
 const CONTAINER = safeContainerName(process.env.PLC_CONTAINER)
+
+// PLC_DOCKER_BIN — docker 可执行文件替代(podman 等),同款白名单校验后才进 spawn。
+function safeDockerBin(raw: string | undefined): string {
+  const bin = raw || 'docker'
+  if (!/^[A-Za-z0-9._/-]+$/.test(bin)) {
+    throw new Error(`Invalid PLC_DOCKER_BIN '${bin}'`)
+  }
+  return bin
+}
+const DOCKER = safeDockerBin(process.env.PLC_DOCKER_BIN)
 const MATIEC_DIR = '/usr/local/share/matiec'
 const MARKER = '{enable code generation}'
 
@@ -30,7 +40,7 @@ async function dockerExecIec2iec(stCode: string): Promise<{ output: string; erro
 
   // Step 1: write file inside container via stdin
   await new Promise<void>((resolve, reject) => {
-    const w = spawn('docker', ['exec', '-i', CONTAINER, 'bash', '-c', `cat > ${containerPath}`])
+    const w = spawn(DOCKER, ['exec', '-i', CONTAINER, 'bash', '-c', `cat > ${containerPath}`])
     w.stdin.write(stCode)
     w.stdin.end()
     w.on('close', (c) => c === 0 ? resolve() : reject(new Error(`write failed: code ${c}`)))
@@ -39,7 +49,7 @@ async function dockerExecIec2iec(stCode: string): Promise<{ output: string; erro
 
   // Step 2: run iec2iec
   const result = await new Promise<{ stdout: string; stderr: string; code: number }>((resolve) => {
-    const p = spawn('docker', ['exec', '-w', MATIEC_DIR, CONTAINER, 'iec2iec', containerPath])
+    const p = spawn(DOCKER, ['exec', '-w', MATIEC_DIR, CONTAINER, 'iec2iec', containerPath])
     let stdout = ''
     let stderr = ''
     p.stdout.on('data', (d) => { stdout += d })
@@ -48,7 +58,7 @@ async function dockerExecIec2iec(stCode: string): Promise<{ output: string; erro
   })
 
   // Step 3: best-effort cleanup
-  spawn('docker', ['exec', CONTAINER, 'rm', '-f', containerPath]).on('close', () => {})
+  spawn(DOCKER, ['exec', CONTAINER, 'rm', '-f', containerPath]).on('close', () => {})
 
   if (result.code !== 0) {
     return { output: '', error: (result.stderr || result.stdout || 'iec2iec failed').slice(0, 500) }

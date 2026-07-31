@@ -11,7 +11,7 @@ import { handleStatus } from '../../sema-plc-tools/dist/tools/status.js'
 import { handleGetLogs } from '../../sema-plc-tools/dist/tools/getLogs.js'
 import { handleForceVariables } from '../../sema-plc-tools/dist/tools/forceVariables.js'
 import { RuntimeClient } from '../../sema-plc-tools/dist/client/runtime.js'
-import type { PlcConfig } from '../../sema-plc-tools/dist/config.js'
+import { dockerBin, type PlcConfig } from '../../sema-plc-tools/dist/config.js'
 
 // Minimal shape PlcController needs from PlcMonitor (avoids a type cycle when
 // running with the injected-mock test setup).
@@ -59,6 +59,7 @@ export class PlcController {
       password: process.env.PLC_PASSWORD ?? 'admin123',
       stateFile: plcStateFileForWorkspace(o.workspace),
       poolSize: Number(process.env.PLC_POOL_SIZE) || 1, // web 控制器不分池;并行 verify 在 plc-tools CLI 进程内按 PLC_POOL_SIZE 决定
+      dockerBin: dockerBin(),
     }
     this.client = new RuntimeClient(this.cfg.url, this.cfg.user, this.cfg.password)
     this.monitor = o.monitor
