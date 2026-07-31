@@ -14,6 +14,7 @@ interface AgentStore {
   messages: ChatMessage[]
   state: 'idle' | 'processing'
   todos: TodoItem[]
+  usage: { useTokens: number; maxTokens: number } | null
   sessionId: string | null
   appendUser: (text: string) => void
   setState: (s: 'idle' | 'processing') => void
@@ -54,7 +55,11 @@ function throttledStorage(base: Storage) {
     if (pending) { base.setItem(pending[0], pending[1]); pending = null }
   }
   pendingFlush = write
-  if (typeof window !== 'undefined') window.addEventListener('pagehide', write)
+  if (typeof window !== 'undefined') {
+    window.addEventListener('pagehide', write)
+    // webview 面板隐藏/销毁不发 pagehide,visibilitychange 是那里唯一可靠的信号
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') write() })
+  }
   return {
     getItem: (k: string) => base.getItem(k),
     setItem: (k: string, v: string) => {
@@ -71,13 +76,14 @@ export const useAgentStore = create<AgentStore>()(
       messages: [],
       state: 'idle',
       todos: [],
+      usage: null,
       sessionId: null,
       setTodos: (todos) => set({ todos }),
       appendUser: (text) => set((s) => ({
         messages: [...s.messages, { id: `u-${Date.now()}`, kind: 'user', text, ts: Date.now() }],
       })),
       setState: (state) => set({ state }),
-      clear: () => set({ messages: [], state: 'idle', todos: [], sessionId: null }),
+      clear: () => set({ messages: [], state: 'idle', todos: [], usage: null, sessionId: null }),
     }),
     {
       name: 'semaplc:agent-chat',
@@ -188,13 +194,16 @@ export function handleAgentWsMessage(m: ServerMessage): void {
     case 'agent:todos':
       st.getState().setTodos(m.todos)
       break
+    case 'agent:usage':
+      st.setState({ usage: { useTokens: m.useTokens, maxTokens: m.maxTokens } })
+      break
     case 'error':
       st.setState((s) => ({ messages: [...s.messages, { id: `e-${Date.now()}`, kind: 'error', text: m.message, ts: Date.now() }] }))
       break
     case 'workspace:ready':
       // 同 sessionId = 同会话的 WS 重连（sticky 重放）→ 不清空（spec H4）；
       // sessionId 变化 = reset/switch 后的新会话 → 清空。
-      st.setState((s) => s.sessionId === m.sessionId ? {} : { messages: [], todos: [], state: 'idle', sessionId: m.sessionId })
+      st.setState((s) => s.sessionId === m.sessionId ? {} : { messages: [], todos: [], state: 'idle', usage: null, sessionId: m.sessionId })
       // 首次（sessionId 为 null）也走上面分支完成记录
       break
     case 'workspace:switching':

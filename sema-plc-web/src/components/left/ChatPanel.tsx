@@ -90,6 +90,7 @@ export function ChatPanel({ onCollapse }: { onCollapse?: () => void } = {}) {
   const messages = useAgentStore((s) => s.messages)
   const agentState = useAgentStore((s) => s.state)
   const todos = useAgentStore((s) => s.todos)
+  const usage = useAgentStore((s) => s.usage)
   const { send, status } = useWsConnection()
   const [input, setInput] = useState('')
   const [shown, setShown] = useState<number[]>(() => pickThree())
@@ -201,6 +202,42 @@ export function ChatPanel({ onCollapse }: { onCollapse?: () => void } = {}) {
             </svg>
             <span>{t('chat.thinking.label')}</span>
           </button>
+          {usage && usage.maxTokens > 0 && (() => {
+            const pct = Math.min(100, Math.round((usage.useTokens / usage.maxTokens) * 100))
+            const C = 2 * Math.PI * 5.5
+            return (
+              // tabIndex:悬停外也能用键盘 Tab 到这里看数据(浮层由 :focus-visible 一并触发)
+              <span
+                className={'ctx-usage' + (pct > 80 ? ' warn' : '')}
+                tabIndex={0}
+                aria-label={t('chat.ctx.tooltip', { used: usage.useTokens.toLocaleString(), max: usage.maxTokens.toLocaleString() })}
+              >
+                <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+                  <circle cx="7" cy="7" r="5.5" fill="none" stroke="currentColor" strokeOpacity="0.25" strokeWidth="2" />
+                  <circle cx="7" cy="7" r="5.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"
+                    strokeDasharray={`${(pct / 100) * C} ${C}`} transform="rotate(-90 7 7)" />
+                </svg>
+                {pct}%
+                <span className="ctx-pop" role="tooltip">
+                  <span className="ctx-pop-title">{t('chat.ctx.pop.title')}</span>
+                  <span className="ctx-pop-row">
+                    <span>{t('chat.ctx.pop.used')}</span>
+                    <b>{usage.useTokens.toLocaleString()}</b>
+                  </span>
+                  <span className="ctx-pop-row">
+                    <span>{t('chat.ctx.pop.left')}</span>
+                    <b>{Math.max(0, usage.maxTokens - usage.useTokens).toLocaleString()}</b>
+                  </span>
+                  <span className="ctx-pop-row muted">
+                    <span>{t('chat.ctx.pop.max')}</span>
+                    <b>{usage.maxTokens.toLocaleString()}</b>
+                  </span>
+                  <span className="ctx-pop-bar"><i style={{ width: `${pct}%` }} /></span>
+                  <span className="ctx-pop-hint">{t('chat.ctx.pop.hint')}</span>
+                </span>
+              </span>
+            )
+          })()}
         </div>
         <div className="chat-input">
           <textarea

@@ -19,6 +19,7 @@ const STICKY_TYPES = new Set<ServerMessage['type']>([
   'editor:open',
   'agent:state',
   'agent:todos',
+  'agent:usage',
   'scene:ready',
   'model:config',
 ])

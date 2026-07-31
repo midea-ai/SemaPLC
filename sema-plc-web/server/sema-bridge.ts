@@ -235,6 +235,10 @@ export class SemaBridge {
     this.session.on('session:interrupted', () => {
       this.mapper?.onInterrupted()
     })
+    // 每次 AI 响应完成后触发 → 前端输入栏的上下文用量指示
+    this.session.on('conversation:usage', (d: { usage: { useTokens: number; maxTokens: number } }) => {
+      if (d?.usage) bus.emit({ type: 'agent:usage', useTokens: d.usage.useTokens, maxTokens: d.usage.maxTokens })
+    })
 
     // Defensive: if a permission request slips through (e.g. sema-core adds a
     // new permission class we haven't accounted for), auto-agree so the

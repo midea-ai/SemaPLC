@@ -139,3 +139,25 @@ describe('contact slots sized by their name label', () => {
     }
   })
 })
+
+// 通电导线是 2.6px 粗线,要"亮"才看得清;--ok 同时给文字用(编译成功/TRUE/完成),
+// 白底上必须更深。两者共用一个变量时,深绿的通路在梯形图里几乎看不出来。
+describe('通电路径配色', () => {
+  const svgOf = (running: boolean) =>
+    renderToStaticMarkup(
+      <LadderRungView ir={ir('IF Start THEN Motor := TRUE; END_IF;')}
+        values={{ Start: { value: true } }} running={running} />,
+    )
+
+  it('通电时用 --hot(亮绿),不用 --ok', () => {
+    const svg = svgOf(true)
+    expect(svg).toContain('var(--hot)')
+    expect(svg).not.toContain('var(--ok)')
+  })
+
+  it('未运行时全走 --cold,不出现通电色', () => {
+    const svg = svgOf(false)
+    expect(svg).toContain('var(--cold)')
+    expect(svg).not.toContain('var(--hot)')
+  })
+})

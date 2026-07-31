@@ -22,7 +22,7 @@ import type {
  * `instance.port` (e.g. `pushtimer.q`, `cnt.cv`).
  */
 
-const HOT = 'var(--ok)'
+const HOT = 'var(--hot)'   // 通电导线用亮绿(粗线要显眼); --ok 是文字语义色,白底上要更深
 const COLD = 'var(--cold)'
 const RAIL = 'var(--rail)'
 

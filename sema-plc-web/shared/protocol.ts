@@ -155,6 +155,8 @@ export type ServerMessage =
   | { type: 'agent:tool-start'; toolId: string; name: string; input: unknown }
   | { type: 'agent:tool-complete'; toolId: string; name: string; result: unknown; isError: boolean; title?: string; input?: unknown }
   | { type: 'agent:todos'; todos: TodoItem[] }
+  // 上下文用量（sema-core conversation:usage,每次 AI 响应完成后更新）
+  | { type: 'agent:usage'; useTokens: number; maxTokens: number }
   // agent 块协议（结构化渲染）。所有块事件带 turnId——中途加入的客户端要能懒建 turn 容器。
   | { type: 'agent:turn-start'; turnId: string }
   | { type: 'agent:block-start'; turnId: string; blockId: string; kind: 'thinking' | 'text' | 'tool'; toolName?: string; input?: unknown }
