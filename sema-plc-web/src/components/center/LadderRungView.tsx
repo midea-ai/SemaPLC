@@ -23,8 +23,8 @@ import type {
  */
 
 const HOT = 'var(--ok)'
-const COLD = '#b9bfca'
-const RAIL = '#5b6373'
+const COLD = 'var(--cold)'
+const RAIL = 'var(--rail)'
 
 // ── Live lookup ────────────────────────────────────────────────────────────
 
@@ -166,7 +166,7 @@ function comparatorGlyph(c: ComparatorElement, x: number, cy: number, pin: boole
     <g key={nk()}>
       {wire(left - 24, cy, left, pin)}
       {wire(left + w, cy, left + w + 24, hot)}
-      <rect x={left} y={cy - 14} width={w} height={28} rx="5" fill="#fff" stroke={col} strokeWidth={hot ? 2.2 : 1.6} />
+      <rect x={left} y={cy - 14} width={w} height={28} rx="0" fill="var(--canvas-bg)" stroke={col} strokeWidth={hot ? 2.2 : 1.6} />
       <text x={x} y={cy + 4} textAnchor="middle" className="ld-name">
         {cmpLabel(c)}
       </text>
@@ -200,8 +200,8 @@ function blockGlyph(x: number, cy: number, title: string, rows: string[], pin: b
     <g key={nk()}>
       {wire(left - 30, cy, left, pin)}
       {wire(left + w, cy, left + w + 30, hot)}
-      <rect x={left} y={top} width={w} height={h} rx="5" fill="#fff" stroke={col} strokeWidth={hot ? 2.2 : 1.6} />
-      <rect x={left} y={top} width={w} height="17" rx="5" fill={hot ? 'var(--brand)' : '#8b93a1'} />
+      <rect x={left} y={top} width={w} height={h} rx="0" fill="var(--canvas-bg)" stroke={col} strokeWidth={hot ? 2.2 : 1.6} />
+      <rect x={left} y={top} width={w} height="17" rx="0" fill={hot ? 'var(--brand)' : 'var(--cold)'} />
       <text x={x} y={top + 12} textAnchor="middle" className="ld-block-title">{title}</text>
       {rows.map((r, i) => (
         <text key={i} x={left + 6} y={top + 31 + i * 13} className="ld-block-row">{r}</text>

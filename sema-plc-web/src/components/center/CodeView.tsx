@@ -21,38 +21,66 @@ const isSot = (p: string) => /io_map|io_mapping/i.test(p)
 
 // ── file tree ──
 interface TreeFile { path: string }
-interface TreeNode { name: string; dir: boolean; file?: TreeFile; children: TreeNode[] }
-function buildTree(paths: string[]): TreeNode {
-  const root: TreeNode = { name: 'workspace', dir: true, children: [] }
+interface TreeNode { name: string; path: string; dir: boolean; file?: TreeFile; children: TreeNode[] }
+export function buildTree(paths: string[]): TreeNode {
+  const root: TreeNode = { name: 'workspace', path: '', dir: true, children: [] }
   for (const path of paths) {
     const parts = path.split('/')
     let node = root
     parts.forEach((part, i) => {
       const isFile = i === parts.length - 1
       let child = node.children.find((c) => c.name === part)
-      if (!child) { child = isFile ? { name: part, dir: false, file: { path }, children: [] } : { name: part, dir: true, children: [] }; node.children.push(child) }
+      if (!child) {
+        const p = parts.slice(0, i + 1).join('/')
+        child = isFile ? { name: part, path: p, dir: false, file: { path }, children: [] } : { name: part, path: p, dir: true, children: [] }
+        node.children.push(child)
+      }
       node = child
     })
   }
+  // 目录在前,同类按名排序
+  const sort = (n: TreeNode) => {
+    n.children.sort((a, b) => (a.dir === b.dir ? a.name.localeCompare(b.name) : a.dir ? -1 : 1))
+    n.children.forEach(sort)
+  }
+  sort(root)
   return root
 }
+/** 某文件路径的所有祖先目录 */
+export const ancestorDirs = (path: string) => path.split('/').slice(0, -1).map((_, i, a) => a.slice(0, i + 1).join('/'))
 
 const ICON_FOLDER = <svg width="14" height="14" viewBox="0 0 16 16"><path d="M1.5 3.5h4l1.2 1.4H14.5v8H1.5z" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" /></svg>
 const ICON_FILE = <svg width="13" height="13" viewBox="0 0 16 16"><path d="M3.5 1.5h6l3 3v10h-9z" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" /><path d="M9.3 1.6v3.2h3" fill="none" stroke="currentColor" strokeWidth="1.2" /></svg>
+const ICON_CARET = <svg width="10" height="10" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3l5 5-5 5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>
 
-function Tree({ node, depth, active, onSelect }: { node: TreeNode; depth: number; active: string | null; onSelect: (p: string) => void }) {
+function Tree({ node, depth, active, collapsed, onSelect, onToggle }: {
+  node: TreeNode; depth: number; active: string | null
+  collapsed: Set<string>; onSelect: (p: string) => void; onToggle: (p: string) => void
+}) {
   const t = useT()
   if (node.dir) {
+    const isCollapsed = depth >= 0 && collapsed.has(node.path)
     return (
       <>
-        {depth >= 0 && <div className="tree-row folder" style={{ paddingLeft: 8 + depth * 14 }}><span className="tree-ic folder-ic">{ICON_FOLDER}</span>{node.name}</div>}
-        {node.children.map((c, i) => <Tree key={i} node={c} depth={depth + 1} active={active} onSelect={onSelect} />)}
+        {depth >= 0 && (
+          <button className="tree-row folder" style={{ paddingLeft: 8 + depth * 14 }}
+            onClick={() => onToggle(node.path)} aria-expanded={!isCollapsed} title={node.path}>
+            <span className={'tree-caret' + (isCollapsed ? '' : ' open')}>{ICON_CARET}</span>
+            <span className="tree-ic folder-ic">{ICON_FOLDER}</span>
+            <span className="tree-fname">{node.name}</span>
+          </button>
+        )}
+        {!isCollapsed && node.children.map((c) => (
+          <Tree key={c.path} node={c} depth={depth + 1} active={active} collapsed={collapsed} onSelect={onSelect} onToggle={onToggle} />
+        ))}
       </>
     )
   }
   const p = node.file!.path
   return (
-    <button className={'tree-row file' + (active === p ? ' active' : '')} style={{ paddingLeft: 8 + depth * 14 }} onClick={() => onSelect(p)}>
+    <button className={'tree-row file' + (active === p ? ' active' : '')} style={{ paddingLeft: 8 + depth * 14 }}
+      onClick={() => onSelect(p)} title={p}>
+      <span className="tree-caret" aria-hidden="true" />
       <span className={'tree-ic file-ic ' + extClass(p)}>{ICON_FILE}</span>
       <span className="tree-fname">{node.name}</span>
       {isSot(p) && <span className="tree-badge sot" title={t('code.badge.sot')}>★</span>}
@@ -74,10 +102,17 @@ export function CodeView({ defaultTreeOpen = true }: { defaultTreeOpen?: boolean
   const { send } = useWsConnection()
   const [checking, setChecking] = useState(false)
   const [treeOpen, setTreeOpen] = useState(defaultTreeOpen)
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
 
   const tree = useMemo(() => buildTree(files.map((f) => f.path)), [files])
   const lang = currentPath ? langOf(currentPath) : 'st'
   const lineCount = stCode ? stCode.split('\n').length : 0
+  // 图签"修订"格:把草稿 ● 和磁盘变更 ⚠ 两个符号合成一个状态读数
+  const rev =
+    isDirty && diskChanged ? { text: t('code.rev.conflict'), cls: 'alarm', tip: t('code.diskChanged.tooltip') }
+    : diskChanged ? { text: t('code.diskChanged'), cls: 'alarm', tip: t('code.diskChanged.tooltip') }
+    : isDirty ? { text: t('code.rev.draft'), cls: 'draft', tip: t('code.unsaved') }
+    : { text: t('code.rev.saved'), cls: '', tip: '' }
 
   // 未保存草稿时,关/刷新整页给浏览器原生确认
   useEffect(() => {
@@ -85,6 +120,16 @@ export function CodeView({ defaultTreeOpen = true }: { defaultTreeOpen?: boolean
     window.addEventListener('beforeunload', handler)
     return () => window.removeEventListener('beforeunload', handler)
   }, [isDirty])
+
+  // 当前文件被(Agent)打开时,自动展开其所在目录
+  useEffect(() => {
+    if (!currentPath) return
+    const dirs = ancestorDirs(currentPath)
+    setCollapsed((prev) => (dirs.some((d) => prev.has(d)) ? new Set([...prev].filter((d) => !dirs.includes(d))) : prev))
+  }, [currentPath])
+
+  const onToggleDir = (p: string) =>
+    setCollapsed((prev) => { const next = new Set(prev); next.has(p) ? next.delete(p) : next.add(p); return next })
 
   const onSelectFile = (p: string) => {
     if (p === currentPath) return
@@ -130,7 +175,7 @@ export function CodeView({ defaultTreeOpen = true }: { defaultTreeOpen?: boolean
           </div>
           {files.length === 0
             ? <div style={{ padding: '8px', fontSize: 12, color: 'var(--text-3)' }}>{t('code.tree.empty')}</div>
-            : <Tree node={tree} depth={-1} active={currentPath} onSelect={onSelectFile} />}
+            : <Tree node={tree} depth={-1} active={currentPath} collapsed={collapsed} onSelect={onSelectFile} onToggle={onToggleDir} />}
         </div>
       )}
       <div className="code-main">
@@ -140,11 +185,23 @@ export function CodeView({ defaultTreeOpen = true }: { defaultTreeOpen?: boolean
               <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><path d="M1.5 3.5h4l1.2 1.4H14.5v8H1.5z" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" /></svg>
             </button>
           )}
-          <span className="code-fname">{currentPath ?? t('code.filebar.noFile')}</span>
+          <div className="tblk-field grow">
+            <span className="tblk-key">{t('code.block.file')}</span>
+            <span className="code-fname">{currentPath ?? t('code.filebar.noFile')}</span>
+          </div>
+          {currentPath && (
+            <>
+              <div className="tblk-field" title={LANG_LABEL[lang]}>
+                <span className="tblk-key">{t('code.block.lines')}</span>
+                <span className="tblk-val mono">{lineCount}</span>
+              </div>
+              <div className="tblk-field">
+                <span className="tblk-key">{t('code.block.rev')}</span>
+                <span className={'tblk-val ' + rev.cls} title={rev.tip}>{rev.text}</span>
+              </div>
+            </>
+          )}
           <div className="code-meta">
-            {currentPath && <span>{LANG_LABEL[lang]} · {t('code.meta.lineCount', { count: lineCount })}</span>}
-            {currentPath && isDirty && <span className="code-dirty" title={t('code.unsaved')}>●</span>}
-            {currentPath && diskChanged && <span className="code-diskchanged" title={t('code.diskChanged.tooltip')}>⚠ {t('code.diskChanged')}</span>}
             {currentPath && (
               <button className={'code-btn' + (diskChanged && isDirty ? ' warn' : '')} onClick={onSave} disabled={!isDirty}
                 title={diskChanged ? t('code.save.overwriteTooltip') : t('code.save.tooltip')}>

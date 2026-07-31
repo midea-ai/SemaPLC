@@ -260,8 +260,9 @@ export function SimRuntime() {
              viewBox={`0 0 ${canvas.width} ${canvas.height}`}
              preserveAspectRatio="xMidYMid meet"
              style={{ width: '100%', height: '100%', display: 'block' }}>
-          <rect x="0.5" y="0.5" width={canvas.width - 1} height={canvas.height - 1} rx="8"
-                fill={canvas.background ?? '#ffffff'} stroke="#e5e7eb"
+          {/* 画面 = 贴在网格图面上的一张图框:直角 + 图纸线(色值同 --panel/--line) */}
+          <rect x="0.5" y="0.5" width={canvas.width - 1} height={canvas.height - 1}
+                fill={canvas.background ?? 'var(--canvas-bg)'} stroke="var(--canvas-line)"
                 vectorEffect="non-scaling-stroke" />
           {parts.map((p) => (
             <Part key={p.id} part={p} pose={layout?.get(p.id) ?? null}

@@ -3,39 +3,39 @@
 /* —— 右上方按钮 —— */
 .plan-indicator{position:relative;flex-shrink:0;}
 .plan-ind-btn{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 11px 0 8px;
-  border-radius:14px;border:1px solid var(--line);background:#fff;color:var(--text-2);
+  border-radius:var(--r-sm);border:1px solid var(--line);background:var(--panel);color:var(--text-2);
   cursor:pointer;font-size:12px;font-weight:600;transition:.15s;}
 .plan-ind-btn:hover{border-color:var(--brand);color:var(--text-1);}
 .plan-ind-ic{display:flex;align-items:center;justify-content:center;width:16px;height:16px;}
 .plan-ind-ic.gear{color:var(--text-3);animation:spin 6s linear infinite;}
 .plan-ind-btn.busy{border-color:var(--brand);color:var(--brand);background:var(--brand-soft);}
 .plan-ind-btn.busy .plan-ind-ic.gear{color:var(--brand);}
-.plan-ind-btn.done{border-color:#CDEBD9;color:var(--ok);background:#E9F9EF;}
+.plan-ind-btn.done{border-color:#BACFEE;color:var(--ok);background:var(--brand-soft);}
 .plan-ind-btn.done .plan-ind-ic{color:var(--ok);}
 .plan-ind-count{font-family:var(--mono);font-size:11.5px;}
 
 /* —— 下拉详情弹层 —— */
 .plan-popover{position:absolute;top:calc(100% + 6px);right:0;z-index:50;
   min-width:260px;max-width:min(340px,72vw);
-  border:1px solid var(--line);border-radius:var(--r-card);background:#FCFCFD;
+  border:1px solid var(--line);border-radius:var(--r-card);background:var(--paper-2);
   box-shadow:0 8px 28px rgba(0,0,0,.12);overflow:hidden;animation:fadein .15s ease;}
 .plan-pop-head{display:flex;align-items:center;gap:8px;padding:10px 14px;
   border-bottom:1px solid var(--line);background:var(--panel);}
 .plan-pop-head .plan-title{font-size:13px;font-weight:700;flex:1;}
 .plan-pop-head .plan-progress{font-size:12px;font-weight:700;color:var(--brand);font-family:var(--mono);
-  background:var(--brand-soft);padding:2px 8px;border-radius:6px;}
+  background:var(--brand-soft);padding:2px 8px;border-radius:var(--r-sm);}
 
 /* —— 步骤行(弹层内复用) —— */
 .plan-steps{padding:6px 8px;display:flex;flex-direction:column;max-height:50vh;overflow:auto;}
-.plan-step{display:flex;align-items:center;gap:10px;padding:7px 8px;font-size:13px;border-radius:7px;}
+.plan-step{display:flex;align-items:center;gap:10px;padding:7px 8px;font-size:13px;border-radius:var(--r-sm);}
 .plan-step.st-active{background:var(--brand-soft);}
-.plan-step.st-error{background:#FDECEC;}
+.plan-step.st-error{background:#FBECEA;}
 .step-label{flex:1;color:var(--text-1);}
 .plan-step.st-pending .step-label{color:var(--text-3);}
 .step-ic{width:17px;height:17px;border-radius:50%;flex:0 0 17px;display:flex;align-items:center;justify-content:center;}
 .step-ic.done{background:var(--ok);}
 .step-ic.error{background:var(--err);}
-.step-ic.pending{border:1.8px solid #CDD2DA;}
+.step-ic.pending{border:1.8px solid var(--rule-strong);}
 .step-ic.active{border:1.8px solid var(--brand);position:relative;}
 .step-half{position:absolute;inset:-1.8px;border-radius:50%;border:1.8px solid transparent;
   border-top-color:var(--brand);border-right-color:var(--brand);animation:spin .8s linear infinite;}

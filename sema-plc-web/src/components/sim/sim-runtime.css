@@ -1,9 +1,11 @@
-.sim-wrap { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: auto; background: #f7f8fa; }
-.sim-bar { display: flex; align-items: center; gap: 10px; padding: 8px 14px; border-bottom: 1px solid var(--line, #e5e7eb); font-size: 13px; color: var(--text-2, #4b5563); }
-.sim-live { color: var(--brand, #10B981); font-weight: 600; }
+.sim-wrap { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: auto; background: var(--paper-2);
+  background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 32px 32px, 32px 32px; }
+.sim-bar { display: flex; align-items: center; gap: 10px; padding: 8px 14px; border-bottom: 1px solid var(--line); font-size: 13px; color: var(--text-2); }
+.sim-live { color: var(--brand); font-weight: 600; }
 .sim-spacer { flex: 1; }
 .sim-stage { flex: 1; display: flex; align-items: center; justify-content: center; padding: 18px; min-height: 0; }
-.sim-label { font: 11px/1.2 monospace; fill: #384150; }
+.sim-label { font: 11px/1.2 monospace; fill: var(--code-text); }
 
 /* conveyor belt scroll + motor spin: only when the 'sim-run' class is added by a class effect */
 @keyframes sim-belt-scroll { from { transform: translateX(0); } to { transform: translateX(30px); } }
@@ -21,10 +23,10 @@
 
 /* Read-time scene-validation errors (a scene that bypassed plc_buildSimulation and would
    otherwise render as a silent dead figure). Surfaced above the stage, not silently. */
-.sim-scene-errors { margin: 10px 14px 0; padding: 10px 12px; border: 1px solid #fca5a5; border-radius: 8px; background: #fef2f2; color: #991b1b; font-size: 12px; }
+.sim-scene-errors { margin: 10px 14px 0; padding: 10px 12px; border: 1px solid #EFC5BF; border-radius: var(--r-sm); background: #FBECEA; color: var(--err); font-size: 12px; }
 .sim-scene-errors ul { margin: 6px 0 4px; padding-left: 18px; }
 .sim-scene-errors li { margin: 2px 0; font-family: monospace; }
-.sim-scene-errors-hint { color: #b45309; }
+.sim-scene-errors-hint { color: var(--warn); }
 
 /* Smooth the 500ms value sampling: ease continuous-value anchors so stepped
    samples don't visibly jump. Boolean run-state (sim-run) uses @keyframes

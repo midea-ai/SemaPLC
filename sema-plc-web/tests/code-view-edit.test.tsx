@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, cleanup, act } from '@testing-library/react'
 import { useEditorStore } from '../src/store/editor'
 import { useLangStore } from '../src/i18n'
@@ -17,6 +17,8 @@ beforeEach(() => {
   useEditorStore.getState().setFiles([{ path: 'a.st', mtime: 1 }, { path: 'b.st', mtime: 2 }])
   useEditorStore.getState().openFile('a.st', 'A')
 })
+// 断言失败会跳过测试体末尾的 cleanup(),残留 DOM 让后续测试报"找到多个元素"——统一在钩子里清
+afterEach(cleanup)
 
 describe('CodeView 编辑工具栏', () => {
   it('未脏时保存按钮禁用;输入后启用,点击发 editor:save', () => {
@@ -32,12 +34,23 @@ describe('CodeView 编辑工具栏', () => {
     cleanup()
   })
 
-  it('diskChanged 时显示徽标', () => {
-    useEditorStore.getState().setStCode('draft')
+  // 图签"修订"格:草稿 / 磁盘已变更 / 冲突(两者同时) 三态读数
+  it('磁盘变更但无草稿 → 修订格显示"磁盘已变更"', () => {
     useEditorStore.getState().onDiskUpdate('B')
     render(<CodeView />)
     expect(screen.getByText(/磁盘已变更/)).toBeTruthy()
-    cleanup()
+  })
+
+  it('草稿 + 磁盘变更 → 修订格显示"冲突"', () => {
+    useEditorStore.getState().setStCode('draft')
+    useEditorStore.getState().onDiskUpdate('B')
+    render(<CodeView />)
+    expect(screen.getByText('冲突')).toBeTruthy()
+  })
+
+  it('无改动 → 修订格显示"已保存"', () => {
+    render(<CodeView />)
+    expect(screen.getByText('已保存')).toBeTruthy()
   })
 
   it('刷新丢弃草稿(本地应用 diskContent)', () => {

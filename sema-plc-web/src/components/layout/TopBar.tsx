@@ -5,6 +5,7 @@ import { useEditorStore } from '../../store/editor'
 import { useWsConnection } from '../../ws/useWsConnection'
 import { useT, useLang, setLang } from '../../i18n'
 import { ModelPanel } from './ModelPanel'
+import { readTheme, applyTheme, type Theme } from '../../theme'
 import type { LayoutMode } from '../../App'
 
 type Tone = 'ok' | 'idle' | 'warn' | 'err'
@@ -32,6 +33,13 @@ export function TopBar({ layout, onToggleLayout }: { layout: LayoutMode; onToggl
   const { send, status: wsStatus } = useWsConnection()
   const [editing, setEditing] = useState(false)
   const [pathInput, setPathInput] = useState('')
+  const [theme, setTheme] = useState<Theme>(readTheme)
+
+  const toggleTheme = () => {
+    const next: Theme = theme === 'sheet' ? 'modern' : 'sheet'
+    setTheme(next)
+    applyTheme(next)
+  }
 
   const submitSwitch = () => {
     if (pathInput.trim()) send({ type: 'workspace:switch', path: pathInput.trim() })
@@ -85,6 +93,16 @@ export function TopBar({ layout, onToggleLayout }: { layout: LayoutMode; onToggl
             <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><rect x="1" y="2" width="4.5" height="12" rx="1" fill="none" stroke="currentColor" strokeWidth="1.2"/><rect x="6.5" y="2" width="4" height="12" rx="1" fill="none" stroke="currentColor" strokeWidth="1.2"/><rect x="11.5" y="2" width="3.5" height="12" rx="1" fill="none" stroke="currentColor" strokeWidth="1.2"/></svg>
           ) : (
             <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><rect x="1" y="2" width="6" height="12" rx="1" fill="none" stroke="currentColor" strokeWidth="1.2"/><rect x="8" y="2" width="7" height="5" rx="1" fill="none" stroke="currentColor" strokeWidth="1.2"/><rect x="8" y="9" width="7" height="5" rx="1" fill="none" stroke="currentColor" strokeWidth="1.2"/></svg>
+          )}
+        </button>
+        <button type="button" className="layout-toggle" onClick={toggleTheme}
+          title={t(theme === 'sheet' ? 'topbar.theme.toModern' : 'topbar.theme.toSheet')}>
+          {theme === 'sheet' ? (
+            /* 图纸态:显示"换成圆角卡片"的去处 */
+            <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><rect x="1.5" y="2.5" width="13" height="11" rx="3" fill="none" stroke="currentColor" strokeWidth="1.2"/><circle cx="5" cy="8" r="1.6" fill="currentColor"/></svg>
+          ) : (
+            /* modern 态:显示"换成网格图纸"的去处 */
+            <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><rect x="1.5" y="2.5" width="13" height="11" fill="none" stroke="currentColor" strokeWidth="1.2"/><path d="M6 2.5v11M10.5 2.5v11M1.5 6.5h13M1.5 10h13" stroke="currentColor" strokeWidth=".8" opacity=".6"/></svg>
           )}
         </button>
         <div className="lang-toggle" role="group" aria-label="Language">
