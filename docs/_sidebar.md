@@ -1,0 +1,30 @@
+- **概述**
+  - [项目概述](wiki/overview/project)
+  - [架构设计](wiki/overview/architecture)
+- **使用**
+  - [快速开始](wiki/getting-started/quick-start)
+  - [模型配置](wiki/getting-started/model-config)
+- **工具链 sema-plc-tools**
+  - [MCP 工具参考](wiki/tools/mcp-tools)
+  - [独立 CLI](wiki/tools/cli)
+  - 核心机制
+    - [编译与部署管线](wiki/tools/compile-pipeline)
+    - [语法检查与 IO 检测](wiki/tools/check-and-io)
+    - [运行时客户端与调试协议](wiki/tools/runtime-client)
+    - [观测与验证工具语义](wiki/tools/observation)
+    - [声明式验证 Runner](wiki/tools/verify-runner)
+    - [过程仿真与 Scene Spec](wiki/tools/simulation)
+    - [状态、配置与安全边界](wiki/tools/state-config)
+  - [OpenPLC 运行时环境](wiki/tools/runtime)
+- **Web IDE sema-plc-web**
+  - [后端总览](wiki/web/backend)
+  - 后端机制
+    - [SemaBridge:内嵌 Agent 集成](wiki/web/sema-bridge)
+    - [模型系统](wiki/web/model-system)
+    - [实时通道与 WS 协议](wiki/web/realtime)
+  - [前端界面总览](wiki/web/frontend)
+  - 前端机制
+    - [ST → 梯形图转换器](wiki/web/ladder-transformer)
+    - [ST 语言支持(编辑器)](wiki/web/st-language)
+    - [聊天面板与工具卡片](wiki/web/chat-ui)
+  - [工作区与 Skills](wiki/web/workspace)

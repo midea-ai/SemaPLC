@@ -53,6 +53,13 @@ session-analysis/
 # 临时调试抓包产物(GLM 请求/响应复现等),不入库
 tmp/
 
-# 文档目录不纳入版本库(README logo 资产除外,见上方 !docs/images/*)
-docs/
+# docs/ 只纳入 docsify 文档站文件与 logo 资产,其余草稿不入库
+docs/*
 !docs/images/
+!docs/index.html
+!docs/style.css
+!docs/_sidebar.md
+!docs/README.md
+!docs/.nojekyll
+!docs/wiki/
+!docs/en/
