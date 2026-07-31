@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import type { ModelConfigState } from '../../shared/protocol'
-import type { WsClient } from '../ws/client'
+import type { WsClientLike } from '../ws/client'
 
 interface ModelStore extends Omit<ModelConfigState, 'thinking'> {
   thinking: boolean | null
@@ -15,7 +15,7 @@ export const useModelStore = create<ModelStore>((set) => ({
   setConfig: (config) => set(config),
 }))
 
-export function subscribeModelToWs(client: WsClient) {
+export function subscribeModelToWs(client: WsClientLike) {
   client.on((m) => {
     if (m.type === 'model:config') useModelStore.getState().setConfig(m.config)
   })

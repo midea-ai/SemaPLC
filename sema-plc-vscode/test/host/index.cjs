@@ -102,15 +102,17 @@ exports.run = async function run() {
       assert.equal(defs[0].range.start.line, 2, '跳到的不是声明所在行')
     })
 
-    step('5/7 semaplc.open:拉起 server 子进程 + 建 webview')
-    await vscode.commands.executeCommand('semaplc.open')
-
-    // server 端口是扩展内部动态分配的,这里靠 health 探活反推它确实起来了。
-    // 扫 127.0.0.1 全端口不现实 —— 改为从扩展的输出通道拿不到,故用「webview 已创建」+
-    // 「node 子进程存在」两个可观测信号,再补一条端口探测(见下)。
-    await check('webview 面板已创建', async () => {
-      await waitFor(async () => vscode.window.tabGroups.all.some((g) => g.tabs.some((t) => t.label === 'SemaPLC')), 'SemaPLC 标签页出现', 30_000)
+    step('5/7 semaplc.open:聚焦对话侧边栏(整合面板已下线)')
+    // 侧边栏是 WebviewView,不在 tabGroups 里 —— 上一版按标签页名字找 'SemaPLC' 的断言
+    // 随面板一起失效了。能在宿主里直接观测的是 views 贡献点自动生成的 <viewId>.focus 命令:
+    // 它存在 ⇒ 视图注册成功(漏写 "type":"webview" 时视图会被当成 tree,但命令仍在,
+    // 所以这条只证明注册,真正证明 webview 起来的是下一步的 health —— server 的懒启动
+    // 就挂在 resolveWebviewView 里,它没跑通 health 必然探不到)。
+    await check('semaplc.chat.focus 命令存在(视图已注册)', async () => {
+      const all = await vscode.commands.getCommands(true)
+      assert.ok(all.includes('semaplc.chat.focus'), '侧边栏视图未注册')
     })
+    await vscode.commands.executeCommand('semaplc.open')
 
     step('6/7 server 健康检查')
     // 端口是扩展动态分配后注入 webview 的 window.__SEMAPLC__,宿主侧读不到。

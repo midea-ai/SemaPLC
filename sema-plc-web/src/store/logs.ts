@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { WsClient } from '../ws/client'
+import type { WsClientLike } from '../ws/client'
 
 export interface LogEntry {
   id: number               // monotonic, assigned by the store — stable identity for UI keys/expansion
@@ -105,7 +105,7 @@ function extractFailureLines(result: unknown): string[] {
   return lines
 }
 
-export function subscribeLogsToWs(client: WsClient) {
+export function subscribeLogsToWs(client: WsClientLike) {
   client.on((m) => {
     switch (m.type) {
       case 'log':

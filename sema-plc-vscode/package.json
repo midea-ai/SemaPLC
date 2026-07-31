@@ -41,21 +41,48 @@
   "main": "./dist/extension.js",
   "contributes": {
     "commands": [
-      { "command": "semaplc.open", "title": "SemaPLC: Open IDE Panel" },
-      { "command": "semaplc.runtime.start", "title": "SemaPLC: Start PLC Runtime" },
-      { "command": "semaplc.runtime.stop", "title": "SemaPLC: Stop PLC Runtime" },
-      { "command": "semaplc.runtime.rebuild", "title": "SemaPLC: Rebuild Runtime Image" },
-      { "command": "semaplc.setApiKey", "title": "SemaPLC: Set LLM API Key" },
-      { "command": "semaplc.check", "category": "SemaPLC", "title": "Check Current ST File" }
+      {
+        "command": "semaplc.open",
+        "title": "SemaPLC: Open IDE Panel"
+      },
+      {
+        "command": "semaplc.runtime.start",
+        "title": "SemaPLC: Start PLC Runtime"
+      },
+      {
+        "command": "semaplc.runtime.stop",
+        "title": "SemaPLC: Stop PLC Runtime"
+      },
+      {
+        "command": "semaplc.runtime.rebuild",
+        "title": "SemaPLC: Rebuild Runtime Image"
+      },
+      {
+        "command": "semaplc.setApiKey",
+        "title": "SemaPLC: Set LLM API Key"
+      },
+      {
+        "command": "semaplc.check",
+        "category": "SemaPLC",
+        "title": "Check Current ST File"
+      }
     ],
     "snippets": [
-      { "language": "st", "path": "./snippets/st.json" }
+      {
+        "language": "st",
+        "path": "./snippets/st.json"
+      }
     ],
     "languages": [
       {
         "id": "st",
-        "extensions": [".st"],
-        "aliases": ["Structured Text", "IEC 61131-3 ST"],
+        "extensions": [
+          ".st"
+        ],
+        "aliases": [
+          "Structured Text",
+          "IEC 61131-3 ST"
+        ],
         "configuration": "./syntaxes/language-configuration.json"
       }
     ],
@@ -67,7 +94,10 @@
       }
     ],
     "mcpServerDefinitionProviders": [
-      { "id": "semaplc.plcTools", "label": "SemaPLC PLC Tools" }
+      {
+        "id": "semaplc.plcTools",
+        "label": "SemaPLC PLC Tools"
+      }
     ],
     "configuration": {
       "title": "SemaPLC",
@@ -110,6 +140,24 @@
           "description": "退出 VSCode 时停止 PLC 运行时容器"
         }
       }
+    },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "semaplc",
+          "title": "SemaPLC",
+          "icon": "resources/activitybar.svg"
+        }
+      ]
+    },
+    "views": {
+      "semaplc": [
+        {
+          "id": "semaplc.chat",
+          "name": "对话",
+          "type": "webview"
+        }
+      ]
     }
   },
   "scripts": {
@@ -122,7 +170,11 @@
   "devDependencies": {
     "@types/node": "^20.14.0",
     "@types/vscode": "^1.101.0",
+    "@types/ws": "^8.18.1",
     "esbuild": "^0.24.0",
     "typescript": "^5.6.0"
+  },
+  "dependencies": {
+    "ws": "^8.21.1"
   }
 }

@@ -3,6 +3,7 @@ import * as net from 'net'
 import * as fs from 'fs'
 import * as path from 'path'
 import { spawn, ChildProcess } from 'child_process'
+import { resolveWorkspace } from './workspace'
 
 /** 各 LLM provider 的 key 环境变量名(与 sema-plc-web/server/model-registry.ts 的 ENV_HINTS 保持一致)。 */
 export const API_KEY_ENVS = [
@@ -51,7 +52,6 @@ export class ServerManager {
   private proc: ChildProcess | undefined
   private ports: ServerPorts | undefined
   private starting: Promise<ServerPorts> | undefined
-  private refs = 0
   private autoRestarted = false
   private workspaceDir: string | undefined
 
@@ -82,14 +82,18 @@ export class ServerManager {
     return this.starting
   }
 
-  /** panel 引用计数:最后一个 panel 关闭时停 server。 */
-  acquire(): void {
-    this.refs++
-  }
-
-  release(): void {
-    this.refs = Math.max(0, this.refs - 1)
-    if (this.refs === 0) void this.stop()
+  /**
+   * 懒启动:已在跑就复用,没跑就按 resolveWorkspace 算出的工作区拉起来。
+   *
+   * 整合面板时期 server 的生死挂在 panel 的引用计数上(acquire/release),面板一下线
+   * 就没有任何人负责它了 —— 侧边栏是 WebviewView,折叠时并不销毁,用引用计数反而会
+   * 在折叠/展开之间反复重启 server。现在改成:谁需要谁 ensure,一直活到 deactivate。
+   *
+   * 不能改成激活即启动:activationEvents 里有 onStartupFinished,那样装了插件的每个
+   * 窗口一开就 spawn 一个 node server 并开始打 PLC 的 REST 口。
+   */
+  ensureServer(): Promise<ServerPorts> {
+    return this.start(resolveWorkspace(this.ctx))
   }
 
   async stop(): Promise<void> {
@@ -240,17 +244,19 @@ export class ServerManager {
       return
     }
     this.setStatus('error')
-    if (!this.autoRestarted && this.refs > 0) {
+    // 沿用原端口重启:bus 的重连会自己接上去,webview 不必重建(它压根不知道端口)。
+    if (!this.autoRestarted) {
       this.autoRestarted = true
       this.out.appendLine('[server] 异常退出,自动重启一次(沿用原端口)…')
       void this.start(workspaceDir, ports).catch(() => undefined)
       return
     }
     void vscode.window
-      .showErrorMessage('SemaPLC server 异常退出。', '查看日志', '重新打开面板')
+      .showErrorMessage('SemaPLC server 异常退出。', '查看日志', '重新连接')
       .then((pick) => {
         if (pick === '查看日志') this.out.show(true)
-        else if (pick === '重新打开面板') void vscode.commands.executeCommand('semaplc.open')
+        // semaplc.open 会 ensureServer + 重建侧边栏(端口可能已经换了一对)
+        else if (pick === '重新连接') void vscode.commands.executeCommand('semaplc.open')
       })
   }
 

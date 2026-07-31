@@ -1,6 +1,6 @@
 import { WebSocketServer, WebSocket } from 'ws'
 import { bus, type BusMessage } from './event-bus.js'
-import type { ClientMessage, ServerMessage } from '../shared/protocol.js'
+import { STICKY_TYPES, type ClientMessage, type ServerMessage } from '../shared/protocol.js'
 
 export interface WsGatewayOptions {
   port: number
@@ -8,25 +8,8 @@ export interface WsGatewayOptions {
   onDisconnect?: () => void
 }
 
-// State-bearing message types: cached and replayed to each new client on connect
-// so a client that joins after backend hydration still sees the current state.
-const STICKY_TYPES = new Set<ServerMessage['type']>([
-  'workspace:ready',
-  'plc:state',
-  'plc:variables',
-  'plc:values',
-  'editor:files',
-  'editor:open',
-  'agent:state',
-  'agent:todos',
-  'agent:usage',
-  'scene:ready',
-  'model:config',
-  // 重连(server 重启/窗口 reload/扩展 reload)后客户端 forced 集会清空,而运行时里
-  // 的强制仍然生效 ⇒ 用户再也解不掉。它是增量事件,直接 sticky 只能恢复最后一次操作,
-  // 所以这里存的是累积出来的等价快照,见 dispatch。
-  'plc:force-result',
-])
+// STICKY_TYPES 已挪到 shared/protocol.ts —— VSCode 扩展的 bus.ts 也要用同一份,
+// 而它不能 import 本文件(会把整个 server 依赖树打进 extension.js)。
 
 export class WsGateway {
   private wss: WebSocketServer

@@ -1,9 +1,9 @@
 import * as vscode from 'vscode'
 import { ServerManager, API_KEY_ENVS } from './server-manager'
-import { SemaPanel, resolveWebRoot } from './panel'
+import { Bus } from './bus'
+import { ChatViewProvider, CHAT_VIEW_ID } from './chat-view'
 import { registerRuntimeCommands } from './runtime-guide'
 import { registerMcpProvider } from './mcp-provider'
-import { resolveWorkspace } from './workspace'
 import { activateStLanguage } from './lang'
 
 let manager: ServerManager | undefined
@@ -12,29 +12,30 @@ export function activate(ctx: vscode.ExtensionContext): void {
   const out = vscode.window.createOutputChannel('SemaPLC Server')
   const status = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100)
   status.text = '$(circuit-board) SemaPLC'
-  status.tooltip = '点击打开 SemaPLC 面板'
+  status.tooltip = '点击打开 SemaPLC 对话'
   status.command = 'semaplc.open'
   status.show()
 
   manager = new ServerManager(ctx, out, status)
-  ctx.subscriptions.push(out, status)
+  const bus = new Bus(out)
+  ctx.subscriptions.push(out, status, { dispose: () => bus.dispose() })
 
   const refreshMcp = registerMcpProvider(ctx, () => manager?.currentWorkspace())
+  // server 就绪后工作区才算敲定,让 MCP 定义跟上 —— 否则 Copilot 那侧还停在上一次算出的路径。
+  const chat = new ChatViewProvider(ctx, bus, manager, refreshMcp)
 
   ctx.subscriptions.push(
+    vscode.window.registerWebviewViewProvider(CHAT_VIEW_ID, chat, {
+      // 折叠侧栏 / 切到别的活动栏图标时不销毁 webview。对 WebviewView 适用
+      // (Copilot Chat 走的正是这条),省掉一次整页重载 + sticky 重放。
+      webviewOptions: { retainContextWhenHidden: true },
+    }),
     vscode.commands.registerCommand('semaplc.open', async () => {
-      try {
-        // 先校验前端产物再拉 server:反过来的话这里一抛,server 已经起来但没有 panel 去 acquire,
-        // 引用计数恒 0 ⇒ release 永不触发,进程空跑到 VSCode 退出为止。
-        const webRoot = resolveWebRoot(ctx.extensionPath)
-        if (!webRoot) throw new Error('找不到前端产物:既无 media/web,也无 ../sema-plc-web/dist(先 npm run build)')
-        const ports = await manager!.start(resolveWorkspace(ctx))
-        SemaPanel.show(ctx, ports, manager!, webRoot)
-        // 面板刚敲定了工作区,让 MCP 定义跟上 —— 否则 Copilot 那侧还停在上一次算出的路径。
-        refreshMcp()
-      } catch (e) {
-        void vscode.window.showErrorMessage(`SemaPLC 启动失败:${e instanceof Error ? e.message : String(e)}`)
-      }
+      // 聚焦侧栏会触发 resolveWebviewView(首次)——server 的懒启动就挂在那里。
+      chat.focus()
+      // 已经 resolve 过的视图不会再 resolve,所以这里补一次:server 崩溃换端口后
+      // 用户点「重新连接」走的正是这条,不重建的话 bus 还连着已经消失的旧端口。
+      chat.reload()
     }),
     vscode.commands.registerCommand('semaplc.setApiKey', () => setApiKey(ctx)),
   )

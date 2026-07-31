@@ -1,10 +1,22 @@
 import type { ClientMessage, ServerMessage } from '../../shared/protocol'
 
-type Listener = (m: ServerMessage) => void
+export type Listener = (m: ServerMessage) => void
 
 export type WsStatus = 'connecting' | 'open' | 'closed' | 'error'
 
-export class WsClient {
+/**
+ * store 与 hook 只依赖这四个方法。抽成接口是为了让 VSCode 侧的 postMessage 传输层
+ * (ws/vscodeClient.ts)能顶替进来 —— WsClient 带 private 字段,TS 下只有它自己的实例
+ * 满足其类型,直接 `import type { WsClient }` 会把别的实现全挡在门外。
+ */
+export interface WsClientLike {
+  getStatus(): WsStatus
+  send(m: ClientMessage): void
+  on(cb: Listener): () => void
+  onStatus(cb: (s: WsStatus) => void): () => void
+}
+
+export class WsClient implements WsClientLike {
   private ws: WebSocket | null = null
   private listeners = new Set<Listener>()
   private statusListeners = new Set<(s: WsStatus) => void>()
@@ -65,15 +77,26 @@ export class WsClient {
 }
 
 // Singleton (constructed in main.tsx)
-let _instance: WsClient | null = null
-export function initWsClient(url: string): WsClient {
+let _instance: WsClientLike | null = null
+export function initWsClient(url: string): WsClientLike {
   if (!_instance) {
-    _instance = new WsClient(url)
-    _instance.connect()
+    const c = new WsClient(url)
+    c.connect()
+    _instance = c
   }
   return _instance
 }
-export function getWsClient(): WsClient {
+
+/**
+ * 注入别的传输实现(VSCode 入口用 postMessage 桥,见 ws/vscodeClient.ts)。
+ * 与 initWsClient 一样是先到先得:两者都只在入口模块顶部调一次。
+ */
+export function setWsClient(client: WsClientLike): WsClientLike {
+  if (!_instance) _instance = client
+  return _instance
+}
+
+export function getWsClient(): WsClientLike {
   if (!_instance) throw new Error('WsClient not initialized')
   return _instance
 }

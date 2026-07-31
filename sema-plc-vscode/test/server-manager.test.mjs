@@ -110,9 +110,10 @@ test('启动成功后 health 可达,stop 后子进程被回收', async (t) => {
   await waitFor(async () => !alive(pid), 'stop 后进程退出')
 })
 
-test('异常退出后自动重启,且沿用原端口(webview 的 __SEMAPLC__ 是写死的)', async (t) => {
+test('异常退出后自动重启,且沿用原端口(bus 靠重连接回去,不重建 webview)', async (t) => {
   const { manager, log } = makeManager(t)
-  manager.acquire() // refs>0 才会自动重启
+  // 不再有 acquire/release:整合面板下线后 server 的生死不挂引用计数了,
+  // 自动重启的唯一条件是「这一轮还没重启过」。
   const first = await manager.start(WORKSPACE)
   const [pid] = pidsFrom(log)
 
@@ -120,14 +121,14 @@ test('异常退出后自动重启,且沿用原端口(webview 的 __SEMAPLC__ 是
   await waitFor(() => healthy(first.httpPort), '自动重启后 health 恢复')
 
   const second = await manager.start(WORKSPACE)
-  assert.deepEqual(second, first, '重启必须复用原端口,否则前端永远连不回来')
+  assert.deepEqual(second, first, '重启必须复用原端口,否则 bus 重连会连到没人监听的端口')
 
   const pids = pidsFrom(log)
   assert.equal(pids.length, 2, '应当只重启了一次')
   assert.equal(alive(pids[0]), false, '被杀的旧进程不该还在')
 
-  manager.release()
-  await waitFor(async () => !alive(pids[1]), 'release 后进程退出')
+  await manager.stop()
+  await waitFor(async () => !alive(pids[1]), 'stop 后进程退出')
 })
 
 test('启动超时:进程必须被收掉,不留 detached 孤儿', { timeout: 40_000 }, async (t) => {

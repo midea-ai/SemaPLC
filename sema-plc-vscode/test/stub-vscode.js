@@ -16,6 +16,16 @@ const rec = (kind, payload) => {
 
 module.exports = {
   __state: state,
+  // bus.attach()/onMessage() 返回 new vscode.Disposable(fn) —— 真货就是「记住一个函数,
+  // dispose 时调它」,照此实现即可。
+  Disposable: class Disposable {
+    constructor(fn) {
+      this._fn = fn
+    }
+    dispose() {
+      this._fn?.()
+    }
+  },
   ThemeColor: class ThemeColor {
     constructor(id) {
       this.id = id

@@ -10,7 +10,9 @@ const options = {
   platform: 'node',
   format: 'cjs',
   target: 'node20',
-  external: ['vscode'],
+  // ws 的两个可选原生加速模块:它内部是 try-require,装了才用。不 external 的话
+  // esbuild 解析不到就直接报错,而它们对本地回环的这点流量毫无意义。
+  external: ['vscode', 'bufferutil', 'utf-8-validate'],
   sourcemap: true,
   minify: !watch,
 }

@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { WsClient } from '../ws/client'
+import type { WsClientLike } from '../ws/client'
 
 interface EditorStore {
   files: Array<{ path: string; mtime: number }>
@@ -62,7 +62,7 @@ export const useEditorStore = create<EditorStore>((set) => ({
   clear: () => set({ files: [], currentPath: null, stCode: '', diskContent: '', stProgram: '', stProgramPath: null, normalized: '', normalizeError: null, isDirty: false, diskChanged: false }),
 }))
 
-export function subscribeEditorToWs(client: WsClient) {
+export function subscribeEditorToWs(client: WsClientLike) {
   client.on((m) => {
     const store = useEditorStore.getState()
     switch (m.type) {

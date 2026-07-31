@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
-import type { WsClient } from '../ws/client'
+import type { WsClientLike } from '../ws/client'
 import type { TodoItem, AgentBlock, SerializedTurn, ServerMessage, ToolBlockResult } from '../../shared/protocol'
 
 export type ChatMessage =
@@ -212,6 +212,6 @@ export function handleAgentWsMessage(m: ServerMessage): void {
   }
 }
 
-export function subscribeAgentToWs(client: WsClient) {
+export function subscribeAgentToWs(client: WsClientLike) {
   client.on(handleAgentWsMessage)
 }

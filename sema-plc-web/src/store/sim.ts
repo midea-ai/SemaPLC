@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { WsClient } from '../ws/client'
+import type { WsClientLike } from '../ws/client'
 import type { SceneSpec } from '../../shared/protocol'
 
 interface SimStore {
@@ -18,7 +18,7 @@ export const useSimStore = create<SimStore>((set) => ({
   clear: () => set({ scene: null, sceneErrors: [], sceneWarnings: [] }),
 }))
 
-export function subscribeSimToWs(client: WsClient) {
+export function subscribeSimToWs(client: WsClientLike) {
   client.on((m) => {
     switch (m.type) {
       case 'scene:ready':

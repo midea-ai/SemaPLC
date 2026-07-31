@@ -1,0 +1,83 @@
+/*
+ * VSCode 侧边栏皮肤:把 semaplc.css 的调色板整体改绑到 var(--vscode-*),
+ * 于是深浅色、高对比度、用户自定主题全都自动跟随,组件一行不改。
+ *
+ * 选择器写 :root:root(特异性 0,3,0)而不是 :root[data-theme="vscode"](0,2,0):
+ * 后者与 semaplc.css 的 :root[data-theme="modern"] 同级,谁赢取决于打包后的 CSS
+ * 顺序 —— 而懒加载 chunk 的 <link> 是运行时追加到 head 末尾的,顺序并不总归我们管。
+ * 多写一个 :root 就与顺序无关了。
+ *
+ * 每个 var() 都带兜底值:webview 之外(单测的 jsdom、误开的浏览器标签)没有 --vscode-*,
+ * 缺兜底会让变量整体失效,界面变成无样式的黑白文本。
+ */
+:root:root[data-theme='vscode'] {
+  --ink: var(--vscode-foreground, #ccc);
+  --bg: var(--vscode-sideBar-background, #1e1e1e);
+  --panel: var(--vscode-sideBar-background, #1e1e1e);
+  --line: var(--vscode-panel-border, rgba(128, 128, 128, 0.35));
+  --paper-2: var(--vscode-textBlockQuote-background, rgba(128, 128, 128, 0.1));
+  --paper-3: var(--vscode-list-hoverBackground, rgba(128, 128, 128, 0.15));
+  --rule-strong: var(--vscode-panel-border, rgba(128, 128, 128, 0.45));
+  /* 网格纸底纹在 VSCode 里是异物 —— 空态/仿真台据此自动不画 */
+  --grid: transparent;
+
+  --text-1: var(--vscode-foreground, #ccc);
+  --text-2: var(--vscode-descriptionForeground, #9d9d9d);
+  --text-3: var(--vscode-disabledForeground, #7f7f7f);
+
+  --brand: var(--vscode-textLink-foreground, #3794ff);
+  --brand-soft: var(--vscode-list-activeSelectionBackground, rgba(55, 148, 255, 0.15));
+
+  --ok: var(--vscode-charts-green, #89d185);
+  --warn: var(--vscode-charts-yellow, #cca700);
+  --err: var(--vscode-errorForeground, #f48771);
+
+  /* VSCode 的界面语言是方角 + 小圆角,不跟 sheet 的图纸风也不跟 modern 的大圆角 */
+  --r-out: 0px;
+  --r-card: 4px;
+  --r-sm: 3px;
+  --label-tr: none;
+  --label-ls: normal;
+
+  /* 工具块里的代码片段:用编辑器自己的底色与语法色,和用户旁边的编辑器对得上 */
+  --code-bg: var(--vscode-textCodeBlock-background, rgba(128, 128, 128, 0.1));
+  --code-text: var(--vscode-editor-foreground, #d4d4d4);
+  --code-gutter: var(--vscode-editorGutter-background, transparent);
+  --code-ln: var(--vscode-editorLineNumber-foreground, #858585);
+  --code-sel: var(--vscode-editor-selectionBackground, rgba(38, 79, 120, 0.6));
+  --code-active: var(--vscode-editor-lineHighlightBackground, rgba(128, 128, 128, 0.08));
+  --tk-kw: var(--vscode-symbolIcon-keywordForeground, #c586c0);
+  --tk-kw-weight: 400;
+  --tk-type: var(--vscode-symbolIcon-classForeground, #4ec9b0);
+  --tk-addr: var(--vscode-symbolIcon-variableForeground, #9cdcfe);
+  --tk-num: var(--vscode-symbolIcon-numberForeground, #b5cea8);
+  --tk-com: var(--vscode-descriptionForeground, #6a9955);
+
+  --pre-bg: var(--vscode-textCodeBlock-background, rgba(128, 128, 128, 0.1));
+  --pre-fg: var(--vscode-editor-foreground, #d4d4d4);
+  --pre-line: var(--vscode-panel-border, transparent);
+
+  --split-gap: 0px;
+  --panel-border: none;
+
+  /* 侧边栏常见 ~300px 宽。这几个上限在 web 版是「按设计宽封顶」,这里一律收到栏宽,
+     否则气泡/工具卡撑出横向滚动条 —— 侧栏里横向滚动等于内容看不见。 */
+  --chat-w: 100%;
+  --max-bubble: 100%;
+  --max-bubble-agent: 100%;
+  --max-think: 100%;
+  --max-tool: 100%;
+
+  --font: var(--vscode-font-family, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif);
+  --mono: var(--vscode-editor-font-family, ui-monospace, Menlo, Consolas, monospace);
+  font-size: var(--vscode-font-size, 13px);
+}
+
+/* 侧边栏的滚动容器是 body 本身(没有 app-root 那层外壳撑高) */
+:root:root[data-theme='vscode'],
+:root:root[data-theme='vscode'] body,
+:root:root[data-theme='vscode'] #root {
+  height: 100%;
+  background: var(--bg);
+  color: var(--text-1);
+}
