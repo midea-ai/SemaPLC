@@ -155,7 +155,7 @@ body.toc-collapsed .markdown-section { padding-right: 0; }
 
 /* Main Content */
 .content { padding: 40px 60px !important; }
-.markdown-section { max-width: 1100px; margin: 0 auto; padding-right: 220px; }
+.markdown-section { position: relative; max-width: 1100px; margin: 0 auto; padding-right: 220px; }
 .markdown-section h1 { color: var(--theme-color-dark); font-size: 2em; font-weight: 600; border-bottom: 2px solid var(--border-color); padding-bottom: 10px; margin-top: 0; }
 .markdown-section h2 { color: var(--theme-color-dark); font-size: 1.5em; font-weight: 600; border-bottom: 1px solid var(--border-color); padding-bottom: 8px; margin-top: 2em; }
 .markdown-section h3 { color: var(--theme-color-dark); font-size: 1.25em; font-weight: 600; margin-top: 1.5em; }
@@ -228,6 +228,7 @@ body.close .sidebar-home-btn { display: none; }
 @media (max-width: 1200px) {
   .right-toc { display: none; }
   .markdown-section { padding-right: 0; }
+  #lang-toggle { right: 0; }
 }
 @media (max-width: 768px) {
   .content { padding: 20px !important; }
@@ -238,20 +239,32 @@ body.close .sidebar-home-btn { display: none; }
   .content { margin-left: 0 !important; }
 }
 
-/* 中英文切换按钮 */
+/* 中英文切换:正文右上角的小胶囊,与 h1 齐平。
+   right 取 markdown-section 自己的 padding-right(给固定定位的 TOC 让出的那条)，
+   所以它正好贴在正文右边缘、不压 TOC;TOC 隐藏时(<=1200px)让位没了,归零。 */
 #lang-toggle {
-  position: fixed;
-  top: 14px;
-  right: 84px;
-  z-index: 30;
-  padding: 4px 12px;
-  border: 1px solid #d7dbdf;
-  border-radius: 14px;
+  position: absolute;
+  top: 2px;
+  right: 220px;
+  z-index: 12;
+  display: inline-flex;
+  border: 1px solid #cfe3ee;
+  border-radius: 999px;
+  overflow: hidden;
   background: #fff;
-  color: #34495e;
-  font-size: 13px;
-  cursor: pointer;
-  transition: all .2s;
 }
-#lang-toggle:hover { border-color: #42b983; color: #42b983; }
-@media (max-width: 768px) { #lang-toggle { right: 64px; top: 10px; } }
+#lang-toggle button {
+  padding: 4px 14px;
+  border: 0;
+  background: transparent;
+  color: #5c6b77;
+  font-size: 13px;
+  font-family: inherit;
+  line-height: 1.5;
+  cursor: pointer;
+  transition: background .15s, color .15s;
+}
+#lang-toggle button + button { border-left: 1px solid #e3eef5; }
+#lang-toggle button:hover:not(.active) { background: #eef7fc; color: var(--theme-color-dark); }
+/* 选中态用 --theme-color 的加深版:原色 #5bbfe8 上放白字对比度仅 2.1:1,读不清 */
+#lang-toggle button.active { background: #1a7aad; color: #fff; font-weight: 600; }

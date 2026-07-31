@@ -104,22 +104,36 @@
       });
     }
 
-    // 中英文切换:/xxx ↔ /en/xxx
+    // 中英文切换:/xxx ↔ /en/xxx。挂在正文右上角(与 h1 齐平),不是原来那个贴着
+    // GitHub 角标的固定按钮。两段并排:一眼看出有哪两种语言、当前在哪个。
     function initLangToggle() {
-      var btn = document.getElementById('lang-toggle');
-      if (!btn) {
-        btn = document.createElement('button');
-        btn.id = 'lang-toggle';
-        btn.onclick = function() {
-          var h = (location.hash.replace(/^#/, '') || '/').split('?')[0];
-          var target = /^\/en(\/|$)/.test(h) ? (h.replace(/^\/en\/?/, '/') || '/') : ('/en' + h);
-          location.hash = '#' + target;
-        };
-        document.body.appendChild(btn);
-      }
+      var host = document.querySelector('.markdown-section');
+      if (!host) return;
       var isEn = /^#\/en(\/|$)/.test(location.hash);
-      btn.textContent = isEn ? '中文' : 'EN';
-      btn.title = isEn ? '切换到中文' : 'Switch to English';
+      var box = document.getElementById('lang-toggle');
+      if (!box) {
+        box = document.createElement('div');
+        box.id = 'lang-toggle';
+        box.setAttribute('role', 'group');
+        box.setAttribute('aria-label', 'Language / 语言');
+        box.innerHTML = '<button type="button" data-lang="zh">中文</button>'
+                      + '<button type="button" data-lang="en">EN</button>';
+        box.addEventListener('click', function(e) {
+          var b = e.target.closest('button');
+          if (!b) return;
+          var toEn = b.getAttribute('data-lang') === 'en';
+          var h = (location.hash.replace(/^#/, '') || '/').split('?')[0];
+          if (toEn === /^\/en(\/|$)/.test(h)) return;   // 已经是该语言
+          location.hash = '#' + (toEn ? '/en' + h : (h.replace(/^\/en\/?/, '/') || '/'));
+        });
+      }
+      // 正文每次路由都整块重渲染,所以每轮都要重新挂进去(元素已存在则是移动,不会重复)
+      host.insertAdjacentElement('afterbegin', box);
+      box.querySelectorAll('button').forEach(function(b) {
+        var on = (b.getAttribute('data-lang') === 'en') === isEn;
+        b.classList.toggle('active', on);
+        b.setAttribute('aria-pressed', on ? 'true' : 'false');
+      });
       // 分页插件的固定文案按语言替换(插件初始化后配置不可变,只能改渲染结果)
       setTimeout(function() {
         document.querySelectorAll('.pagination-item-label span').forEach(function(s) {
