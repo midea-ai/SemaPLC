@@ -15,6 +15,10 @@ export const CHAT_VIEW_ID = 'semaplc.chat'
  */
 export class ChatViewProvider implements vscode.WebviewViewProvider {
   private view: vscode.WebviewView | undefined
+  /** 当前这份 bus 订阅。resolve 会被反复调用,旧的必须摘掉(见 Bus.attach 的注释)。 */
+  private attached: vscode.Disposable | undefined
+  /** 上一次连上的 ws 端口,用来判断要不要重建 webview。 */
+  private lastWsPort: number | undefined
 
   constructor(
     private readonly ctx: vscode.ExtensionContext,
@@ -37,22 +41,47 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       return
     }
 
+    view.onDidDispose(() => {
+      if (this.view !== view) return
+      this.attached?.dispose()
+      this.attached = undefined
+      this.view = undefined
+    })
+
     view.webview.html = placeholder('SemaPLC', '正在启动本地 server…')
     try {
       const ports = await this.manager.ensureServer()
       this.bus.connect(ports.wsPort)
+      this.lastWsPort = ports.wsPort
       // html 一赋值 webview 就从头加载,随后它自己发 view:ready,重放由那里触发。
       view.webview.html = buildWebviewHtml(view.webview, webRoot, 'chat.html')
-      this.ctx.subscriptions.push(this.bus.attach('chat', view.webview))
+      // 先摘旧订阅再挂新的。Bus.attach 内部也守了一道,这里摘是为了不让 attach 出来的
+      // Disposable 无限堆在 ctx.subscriptions 上(那份只有扩展停用时才清)。
+      this.attached?.dispose()
+      this.attached = this.bus.attach('chat', view.webview)
       this.onServerReady()
     } catch (e) {
       view.webview.html = placeholder('启动失败', e instanceof Error ? e.message : String(e))
     }
   }
 
-  /** server 换了端口(崩溃后重启会抢新端口)⇒ 重新 resolve 一次,让 bus 改连新端口。 */
-  reload(): void {
-    if (this.view) void this.resolveWebviewView(this.view)
+  /**
+   * server 可能换了端口(崩溃后重启会抢新的一对)。端口没变就只确保连着,**不重建** ——
+   * 重建等于 webview 整页重载,用户正在输入的半句话和滚动位置都会没。
+   */
+  async refresh(): Promise<void> {
+    if (!this.view) return
+    const ports = await this.manager.ensureServer()
+    if (ports.wsPort === this.lastWsPort) {
+      this.bus.connect(ports.wsPort) // 已连着就是空操作
+      return
+    }
+    await this.resolveWebviewView(this.view)
+  }
+
+  dispose(): void {
+    this.attached?.dispose()
+    this.attached = undefined
   }
 
   focus(): void {

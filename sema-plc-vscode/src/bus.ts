@@ -19,8 +19,8 @@ export class Bus {
   private ws: WebSocket | undefined
   private url: string | undefined
   private status: WsStatus = 'closed'
-  /** 每个 view 一份 webview 句柄;ready 之前不推任何东西。 */
-  private views = new Map<string, { webview: vscode.Webview; ready: boolean }>()
+  /** 每个 view 一份 webview 句柄 + 它的消息订阅;ready 之前不推任何东西。 */
+  private views = new Map<string, { webview: vscode.Webview; ready: boolean; sub: vscode.Disposable }>()
   private sticky = new Map<ServerMessage['type'], ServerMessage>()
   private extListeners = new Set<(m: ServerMessage) => void>()
   private reconnectTimer: ReturnType<typeof setTimeout> | undefined
@@ -92,11 +92,24 @@ export class Bus {
     }, delay)
   }
 
-  /** 注册一个 webview。返回的 Disposable 用于视图销毁时摘掉它。 */
+  /**
+   * 注册一个 webview。返回的 Disposable 用于视图销毁时摘掉它。
+   *
+   * 同名 view 重复 attach 会先摘掉上一份订阅 —— resolveWebviewView 是会被反复调用的
+   * (每次 semaplc.open、视图重建都来一次),而 onDidReceiveMessage 是多播:旧的不摘,
+   * 用户敲一句话就被转发 N 次,agent 那边真的会跑 N 轮。
+   *
+   * 幂等做在这里而不是让调用方记得先 dispose:调用方只要漏一次就是这个 bug,
+   * 而这里守一次,所有入口都不会踩。
+   */
   attach(view: string, webview: vscode.Webview): vscode.Disposable {
-    this.views.set(view, { webview, ready: false })
+    this.views.get(view)?.sub.dispose()
     const sub = webview.onDidReceiveMessage((msg: unknown) => this.onViewMessage(view, msg))
+    this.views.set(view, { webview, ready: false, sub })
     return new vscode.Disposable(() => {
+      // 只摘自己:重复 attach 之后旧的 Disposable 可能晚到,那时 views 里存的已经是
+      // 新一份订阅,不能让它把还在用的连带删掉。
+      if (this.views.get(view)?.sub !== sub) return
       sub.dispose()
       this.views.delete(view)
     })

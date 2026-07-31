@@ -25,21 +25,28 @@ let socket
 
 const out = { appendLine: () => {} }
 
-/** 假 webview:记下扩展 postMessage 过来的每一条,并能反手模拟 webview 发消息。 */
+/**
+ * 假 webview:记下扩展 postMessage 过来的每一条,并能反手模拟 webview 发消息。
+ *
+ * onDidReceiveMessage 必须是**多播**(每次注册都追加一个监听器,返回的 Disposable 摘掉
+ * 自己)—— 真货就是这个语义。早先这里写成「后注册的覆盖前一个」,于是重复注册在测试里
+ * 毫无症状,而在真实 VSCode 里表现为一条输入被发 N 次。fake 比真货宽容,等于没测。
+ */
 function fakeWebview() {
   const posted = []
-  let handler
+  const handlers = new Set()
   return {
     posted,
+    handlerCount: () => handlers.size,
     postMessage: (m) => {
       posted.push(m)
       return Promise.resolve(true)
     },
     onDidReceiveMessage: (h) => {
-      handler = h
-      return { dispose: () => {} }
+      handlers.add(h)
+      return { dispose: () => handlers.delete(h) }
     },
-    fromWebview: (m) => handler?.(m),
+    fromWebview: (m) => handlers.forEach((h) => h(m)),
   }
 }
 
@@ -126,6 +133,29 @@ test('ready 之后的消息直接转发;webview 的 ws:send 回灌到 server', a
   wv.fromWebview({ type: 'ws:send', payload: { type: 'agent:prompt', text: 'hello' } })
   await waitFor(() => received.length > 0, 'server 收到回灌')
   assert.deepEqual(received[0], { type: 'agent:prompt', text: 'hello' })
+})
+
+test('重复 attach 同一个 view:只留最后一份订阅,一条输入就是一条', async (t) => {
+  // 回归:resolveWebviewView 会被反复调用(用户每点一次 semaplc.open 就来一次),
+  // 而每次 attach 都往同一个 webview 上挂一个 onDidReceiveMessage。旧的不摘掉,
+  // 用户敲一句话就被转发 N 次 —— 界面上是同一句话连发好几条,agent 也真的跑了好几轮。
+  const bus = new Bus(out)
+  t.after(() => bus.dispose())
+  const wv = fakeWebview()
+  socket = undefined
+  bus.connect(port)
+  await waitFor(() => socket, 'hub 连上来')
+
+  for (let i = 0; i < 5; i++) bus.attach('chat', wv)
+  assert.equal(wv.handlerCount(), 1, 'attach 五次也只该留一个监听器')
+
+  wv.fromWebview({ type: 'view:ready', view: 'chat' })
+  await waitFor(() => wv.posted.some((m) => m.type === 'ws:status'), '握手完成')
+
+  received = []
+  wv.fromWebview({ type: 'ws:send', payload: { type: 'agent:prompt', text: 'hello' } })
+  await new Promise((r) => setTimeout(r, 200))
+  assert.equal(received.length, 1, `一条输入只该到 server 一次,实际 ${received.length} 次`)
 })
 
 test('换端口时清掉 sticky —— 那是上一个 server 进程的状态', async (t) => {

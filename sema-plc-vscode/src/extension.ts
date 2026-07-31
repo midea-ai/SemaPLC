@@ -23,6 +23,7 @@ export function activate(ctx: vscode.ExtensionContext): void {
   const refreshMcp = registerMcpProvider(ctx, () => manager?.currentWorkspace())
   // server 就绪后工作区才算敲定,让 MCP 定义跟上 —— 否则 Copilot 那侧还停在上一次算出的路径。
   const chat = new ChatViewProvider(ctx, bus, manager, refreshMcp)
+  ctx.subscriptions.push({ dispose: () => chat.dispose() })
 
   ctx.subscriptions.push(
     vscode.window.registerWebviewViewProvider(CHAT_VIEW_ID, chat, {
@@ -33,9 +34,10 @@ export function activate(ctx: vscode.ExtensionContext): void {
     vscode.commands.registerCommand('semaplc.open', async () => {
       // 聚焦侧栏会触发 resolveWebviewView(首次)——server 的懒启动就挂在那里。
       chat.focus()
-      // 已经 resolve 过的视图不会再 resolve,所以这里补一次:server 崩溃换端口后
-      // 用户点「重新连接」走的正是这条,不重建的话 bus 还连着已经消失的旧端口。
-      chat.reload()
+      // 已 resolve 的视图不会再 resolve,所以补一次 refresh:server 崩溃换端口后
+      // 用户点「重新连接」走的正是这条。refresh 只在端口真变了时才重建 —— 早先这里
+      // 写的是无条件 reload,于是每点一次就整页重载一遍,还多挂一份消息订阅。
+      await chat.refresh()
     }),
     vscode.commands.registerCommand('semaplc.setApiKey', () => setApiKey(ctx)),
   )
