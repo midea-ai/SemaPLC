@@ -260,8 +260,8 @@ export function SimRuntime() {
              viewBox={`0 0 ${canvas.width} ${canvas.height}`}
              preserveAspectRatio="xMidYMid meet"
              style={{ width: '100%', height: '100%', display: 'block' }}>
-          {/* 画面 = 贴在网格图面上的一张图框:直角 + 图纸线(色值同 --panel/--line) */}
-          <rect x="0.5" y="0.5" width={canvas.width - 1} height={canvas.height - 1}
+          {/* 画面 = 贴在网格图面上的一张图框(色值同 --panel/--line) */}
+          <rect x="0.5" y="0.5" width={canvas.width - 1} height={canvas.height - 1} rx="8"
                 fill={canvas.background ?? 'var(--canvas-bg)'} stroke="var(--canvas-line)"
                 vectorEffect="non-scaling-stroke" />
           {parts.map((p) => (
@@ -284,8 +284,14 @@ function Part({ part, pose, input }: {
   const y = pose?.y ?? part.y
   const rot = pose?.rotation ?? part.rotation ?? 0
   const transform = `translate(${x},${y})${rot ? ` rotate(${rot})` : ''}`
+  // custom = 一整幅自绘画面(通常就是整块 canvas),标题画在 svg 里,外层没有地方放标注:
+  // 它不在 PARTS_CATALOG 里,盒高会回退成库部件的 64,标注正好落在画面内 y≈78 压住标题;
+  // 按 viewBox 高度改画到画面下方又会溢出到画布外成一行游离小字。所以 custom 不画外层标注,
+  // 说明文字由 svg 自己承担(见 plc-build-simulation skill)。
   const boxH = PARTS_CATALOG.find((d) => d.kind === part.kind)?.box.h ?? 64
-  const label = part.label ? <text className="sim-label" x={0} y={boxH + 14}>{part.label}</text> : null
+  const label = part.label && part.kind !== 'custom'
+    ? <text className="sim-label" x={0} y={boxH + 14}>{part.label}</text>
+    : null
   const inner = part.kind === 'custom'
     ? <g dangerouslySetInnerHTML={{ __html: sanitizeSvg(sizeCustomSvg(part.svg ?? '')) }} />
     : (PART_REGISTRY[part.kind] ? PART_REGISTRY[part.kind](part.params ?? {}) : <text className="sim-label" y={20}>?{part.kind}</text>)

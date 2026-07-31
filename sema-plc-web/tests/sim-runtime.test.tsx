@@ -200,16 +200,6 @@ describe('SimRuntime', () => {
     const label = container.querySelector('[data-part-id="cv"] text.sim-label')!
     expect(Number(label.getAttribute('y'))).toBe(68)
   })
-  it('falls back to y=78 for a custom kind not in the catalog (box.h default 64)', () => {
-    useSimStore.getState().setScene({
-      version: '1', canvas: { width: 200, height: 200 },
-      parts: [{ id: 'c', kind: 'custom', x: 0, y: 0, label: 'x', svg: '<rect id="r" width="10" height="10"/>', bindings: [] }],
-    } as any)
-    const { container } = render(<SimRuntime />)
-    const label = container.querySelector('[data-part-id="c"] text.sim-label')!
-    expect(Number(label.getAttribute('y'))).toBe(78)
-  })
-
   it('marks tweenable custom binding targets with data-sim-tween (not text/visible)', () => {
     // 场景:custom 内 car 绑 translateY(可补间)、label1 绑 text(不可补间)
     const scene: SceneSpec = {
@@ -303,5 +293,29 @@ describe('SimRuntime v2 layout + translateAlong', () => {
     setValue('pos', 999)
     rerender(<SimRuntime />)
     expect(wp.getAttribute('transform')).toBe('translate(220,77)')
+  })
+})
+
+// custom 部件 = 一整幅自绘画面,标题画在 svg 里。之前外层还会再画一次 part.label,
+// 且 y 取自 PARTS_CATALOG(里面没有 custom → 回退 64)→ 标注落在 y=78,正好压住画面内
+// y≈75 的标题(实测:分拣场景左上角两行字叠在一起)。
+describe('custom 部件的标注', () => {
+  const customScene = (): SceneSpec => ({
+    version: '1', canvas: { width: 400, height: 300 },
+    parts: [{ id: 'pic', kind: 'custom', x: 0, y: 0, label: '分拣线',
+      svg: '<svg viewBox="0 0 400 300"><text x="10" y="75">传送带颜色 / 高度分拣</text></svg>', bindings: [] }],
+  })
+
+  it('不画外层标注(不会压住画面自己的标题)', () => {
+    useSimStore.getState().setScene(customScene())
+    const { container } = render(<SimRuntime />)
+    expect([...container.querySelectorAll('text.sim-label')].some((n) => n.textContent === '分拣线')).toBe(false)
+    expect(container.textContent).toContain('传送带颜色 / 高度分拣')
+  })
+
+  it('库部件的标注照常渲染', () => {
+    useSimStore.getState().setScene(LAMP_SCENE)
+    const { container } = render(<SimRuntime />)
+    expect([...container.querySelectorAll('text.sim-label')].some((n) => n.textContent === 'red')).toBe(true)
   })
 })
