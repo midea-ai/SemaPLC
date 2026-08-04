@@ -184,6 +184,93 @@ export function ChatPanel({ onCollapse }: { onCollapse?: () => void } = {}) {
     ? { cls: 'busy', text: t('chat.badge.processing') }
     : status === 'open' ? { cls: 'ok', text: t('chat.badge.ready') } : { cls: '', text: status === 'connecting' ? t('chat.badge.connecting') : t('chat.badge.offline') }
 
+  // 输入区的部件两端共用,只有外壳不同 —— 见下面 onCollapse 分支处的说明。
+  const usageRing = usage && usage.maxTokens > 0 && (() => {
+    const pct = Math.min(100, Math.round((usage.useTokens / usage.maxTokens) * 100))
+    const C = 2 * Math.PI * 5.5
+    return (
+      // tabIndex:悬停外也能用键盘 Tab 到这里看数据(浮层由 :focus-visible 一并触发)
+      <span
+        className={'ctx-usage' + (pct > 80 ? ' warn' : '')}
+        tabIndex={0}
+        aria-label={t('chat.ctx.tooltip', { used: usage.useTokens.toLocaleString(), max: usage.maxTokens.toLocaleString() })}
+      >
+        <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+          <circle cx="7" cy="7" r="5.5" fill="none" stroke="currentColor" strokeOpacity="0.25" strokeWidth="2" />
+          <circle cx="7" cy="7" r="5.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"
+            strokeDasharray={`${(pct / 100) * C} ${C}`} transform="rotate(-90 7 7)" />
+        </svg>
+        {pct}%
+        <span className="ctx-pop" role="tooltip">
+          <span className="ctx-pop-title">{t('chat.ctx.pop.title')}</span>
+          <span className="ctx-pop-row">
+            <span>{t('chat.ctx.pop.used')}</span>
+            <b>{usage.useTokens.toLocaleString()}</b>
+          </span>
+          <span className="ctx-pop-row">
+            <span>{t('chat.ctx.pop.left')}</span>
+            <b>{Math.max(0, usage.maxTokens - usage.useTokens).toLocaleString()}</b>
+          </span>
+          <span className="ctx-pop-row muted">
+            <span>{t('chat.ctx.pop.max')}</span>
+            <b>{usage.maxTokens.toLocaleString()}</b>
+          </span>
+          <span className="ctx-pop-bar"><i style={{ width: `${pct}%` }} /></span>
+          <span className="ctx-pop-hint">{t('chat.ctx.pop.hint')}</span>
+        </span>
+      </span>
+    )
+  })()
+
+  const thinkingBtn = (
+    <button
+      type="button"
+      className={'thinking-toggle' + (thinking ? ' on' : '')}
+      onClick={toggleThinking}
+      disabled={inputDisabled}
+      title={thinking ? t('chat.thinking.on') : t('chat.thinking.off')}
+    >
+      <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true">
+        <path d="M8 1a5.5 5.5 0 0 0-2 10.63V13a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1v-1.37A5.5 5.5 0 0 0 8 1Z" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
+        <path d="M6 15h4" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+      </svg>
+      <span>{t('chat.thinking.label')}</span>
+    </button>
+  )
+
+  const textareaEl = (
+    <textarea
+      rows={1}
+      placeholder={status === 'open' ? (agentState === 'processing' ? t('chat.input.placeholder.processing') : t('chat.input.placeholder.ready')) : status === 'connecting' ? t('chat.input.placeholder.connecting') : t('chat.input.placeholder.offline')}
+      value={input}
+      onChange={(e) => setInput(e.target.value)}
+      onCompositionStart={() => { composingRef.current = true }}
+      onCompositionEnd={() => {
+        setTimeout(() => { composingRef.current = false }, 0)
+      }}
+      onKeyDown={(e) => { if (shouldSubmitOnEnter(e, composingRef.current)) { e.preventDefault(); if (!sendDisabled) submit() } }}
+      disabled={inputDisabled}
+    />
+  )
+
+  const sendBtn = agentState === 'processing' ? (
+    <button
+      type="button"
+      className="send-btn stop"
+      onClick={() => send({ type: 'agent:interrupt' })}
+      disabled={status !== 'open'}
+      title={t('chat.stop.tooltip')}
+      aria-label={t('chat.stop')}
+    >
+      {/* 两条竖线(暂停样式)— 处理中时取代发送箭头,点击发 agent:interrupt 中断当前 turn */}
+      <svg width="13" height="13" viewBox="0 0 16 16" aria-hidden="true"><rect x="3.5" y="3" width="3" height="10" rx="1.2" fill="currentColor" /><rect x="9.5" y="3" width="3" height="10" rx="1.2" fill="currentColor" /></svg>
+    </button>
+  ) : (
+    <button className="send-btn" onClick={() => submit()} disabled={sendDisabled} title={t('chat.send')} aria-label={t('chat.send')}>
+      <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 8h11M9 4l4 4-4 4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" /></svg>
+    </button>
+  )
+
   return (
     <section className="chat-panel">
       <StatusBar />
@@ -246,116 +333,58 @@ export function ChatPanel({ onCollapse }: { onCollapse?: () => void } = {}) {
         </div>
       )}
 
-      <div className="composer-wrap">
-        <div className="composer">
-        {/* 顶行:待办进度 / 非就绪时的连接态 / 上下文用量。三者都没有时靠 :empty 收掉整行。 */}
-        <div className="composer-top">
-          {!onCollapse && <PlanIndicator processing={agentState === 'processing'} todos={todos} />}
-          {status !== 'open' && <span className={'chat-head-badge ' + badge.cls}>{badge.text}</span>}
-          {usage && usage.maxTokens > 0 && (() => {
-            const pct = Math.min(100, Math.round((usage.useTokens / usage.maxTokens) * 100))
-            const C = 2 * Math.PI * 5.5
-            return (
-              // tabIndex:悬停外也能用键盘 Tab 到这里看数据(浮层由 :focus-visible 一并触发)
-              <span
-                className={'ctx-usage' + (pct > 80 ? ' warn' : '')}
-                tabIndex={0}
-                aria-label={t('chat.ctx.tooltip', { used: usage.useTokens.toLocaleString(), max: usage.maxTokens.toLocaleString() })}
-              >
-                <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
-                  <circle cx="7" cy="7" r="5.5" fill="none" stroke="currentColor" strokeOpacity="0.25" strokeWidth="2" />
-                  <circle cx="7" cy="7" r="5.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"
-                    strokeDasharray={`${(pct / 100) * C} ${C}`} transform="rotate(-90 7 7)" />
-                </svg>
-                {pct}%
-                <span className="ctx-pop" role="tooltip">
-                  <span className="ctx-pop-title">{t('chat.ctx.pop.title')}</span>
-                  <span className="ctx-pop-row">
-                    <span>{t('chat.ctx.pop.used')}</span>
-                    <b>{usage.useTokens.toLocaleString()}</b>
-                  </span>
-                  <span className="ctx-pop-row">
-                    <span>{t('chat.ctx.pop.left')}</span>
-                    <b>{Math.max(0, usage.maxTokens - usage.useTokens).toLocaleString()}</b>
-                  </span>
-                  <span className="ctx-pop-row muted">
-                    <span>{t('chat.ctx.pop.max')}</span>
-                    <b>{usage.maxTokens.toLocaleString()}</b>
-                  </span>
-                  <span className="ctx-pop-bar"><i style={{ width: `${pct}%` }} /></span>
-                  <span className="ctx-pop-hint">{t('chat.ctx.pop.hint')}</span>
-                </span>
-              </span>
-            )
-          })()}
+      {/* 两端的输入区外壳分开 —— 约束不一样:
+          web:顶栏有 ModelPanel、chat-head 有 PlanIndicator 和连接态,这里只留思考 + 用量
+          侧边栏:两者都没有,模型下拉 / 待办 / 连接态只能收进 composer */}
+      {onCollapse ? (
+        <div className="chat-input-wrap">
+          <div className="chat-input-bar">
+            {thinkingBtn}
+            {usageRing}
+          </div>
+          <div className="chat-input">
+            {textareaEl}
+            {sendBtn}
+          </div>
         </div>
-        <textarea
-          rows={1}
-          placeholder={status === 'open' ? (agentState === 'processing' ? t('chat.input.placeholder.processing') : t('chat.input.placeholder.ready')) : status === 'connecting' ? t('chat.input.placeholder.connecting') : t('chat.input.placeholder.offline')}
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onCompositionStart={() => { composingRef.current = true }}
-          onCompositionEnd={() => {
-            setTimeout(() => { composingRef.current = false }, 0)
-          }}
-          onKeyDown={(e) => { if (shouldSubmitOnEnter(e, composingRef.current)) { e.preventDefault(); if (!sendDisabled) submit() } }}
-          disabled={inputDisabled}
-        />
-        {/* 底行:模型 / 深度思考 / 发送。原生 <select> 而不是自绘弹层 —— 它自带键盘、
-            滚动和窄栏下的定位,侧边栏只有 ~300px 宽,自绘的那套第一件事就是被截断。 */}
-        <div className="composer-bar">
-          {modelOptions.length > 0 && (
-            <select
-              className="model-select"
-              value={modelSelected ?? ''}
-              // 只看 WS,不看 noModel:没配 key 时切模型正是用户唯一该做的事,
-              // 用 inputDisabled 禁掉等于把人锁死在一个用不了的模型上。
-              disabled={wsDown}
-              title={t('chat.model.tooltip')}
-              aria-label={t('chat.model.tooltip')}
-              onChange={(e) => send({ type: 'model:switch', key: e.target.value })}
-            >
-              {modelSelected === null && <option value="">—</option>}
-              {modelOptions.map((o) => (
-                <option key={o.key} value={o.key}>
-                  {((lang === 'en' && o.labelEn) || o.label) + (o.configured ? '' : ` · ${t('chat.model.unconfigured')}`)}
-                </option>
-              ))}
-            </select>
-          )}
-          <button
-            type="button"
-            className={'thinking-toggle' + (thinking ? ' on' : '')}
-            onClick={toggleThinking}
-            disabled={inputDisabled}
-            title={thinking ? t('chat.thinking.on') : t('chat.thinking.off')}
-          >
-            <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true">
-              <path d="M8 1a5.5 5.5 0 0 0-2 10.63V13a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1v-1.37A5.5 5.5 0 0 0 8 1Z" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
-              <path d="M6 15h4" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
-            </svg>
-            <span>{t('chat.thinking.label')}</span>
-          </button>
-          {agentState === 'processing' ? (
-            <button
-              type="button"
-              className="send-btn stop"
-              onClick={() => send({ type: 'agent:interrupt' })}
-              disabled={status !== 'open'}
-              title={t('chat.stop.tooltip')}
-              aria-label={t('chat.stop')}
-            >
-              {/* 两条竖线(暂停样式)— 处理中时取代发送箭头,点击发 agent:interrupt 中断当前 turn */}
-              <svg width="13" height="13" viewBox="0 0 16 16" aria-hidden="true"><rect x="3.5" y="3" width="3" height="10" rx="1.2" fill="currentColor" /><rect x="9.5" y="3" width="3" height="10" rx="1.2" fill="currentColor" /></svg>
-            </button>
-          ) : (
-            <button className="send-btn" onClick={() => submit()} disabled={sendDisabled} title={t('chat.send')} aria-label={t('chat.send')}>
-              <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 8h11M9 4l4 4-4 4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" /></svg>
-            </button>
-          )}
+      ) : (
+        <div className="composer-wrap">
+          <div className="composer">
+            {/* 顶行:待办进度 / 非就绪时的连接态 / 上下文用量。三者都没有时靠 :empty 收掉整行。 */}
+            <div className="composer-top">
+              <PlanIndicator processing={agentState === 'processing'} todos={todos} />
+              {status !== 'open' && <span className={'chat-head-badge ' + badge.cls}>{badge.text}</span>}
+              {usageRing}
+            </div>
+            {textareaEl}
+            {/* 底行:模型 / 深度思考 / 发送。原生 <select> 而不是自绘弹层 —— 它自带键盘、
+                滚动和窄栏下的定位,侧边栏只有 ~300px 宽,自绘的那套第一件事就是被截断。 */}
+            <div className="composer-bar">
+              {modelOptions.length > 0 && (
+                <select
+                  className="model-select"
+                  value={modelSelected ?? ''}
+                  // 只看 WS,不看 noModel:没配 key 时切模型正是用户唯一该做的事,
+                  // 用 inputDisabled 禁掉等于把人锁死在一个用不了的模型上。
+                  disabled={wsDown}
+                  title={t('chat.model.tooltip')}
+                  aria-label={t('chat.model.tooltip')}
+                  onChange={(e) => send({ type: 'model:switch', key: e.target.value })}
+                >
+                  {modelSelected === null && <option value="">—</option>}
+                  {modelOptions.map((o) => (
+                    <option key={o.key} value={o.key}>
+                      {((lang === 'en' && o.labelEn) || o.label) + (o.configured ? '' : ` · ${t('chat.model.unconfigured')}`)}
+                    </option>
+                  ))}
+                </select>
+              )}
+              {thinkingBtn}
+              {sendBtn}
+            </div>
+          </div>
         </div>
-        </div>
-      </div>
+      )}
     </section>
   )
 }

@@ -363,7 +363,16 @@
 .typing span:nth-child(3){animation-delay:.3s;}
 @keyframes typing{0%,60%,100%{transform:translateY(0);opacity:.4;}30%{transform:translateY(-4px);opacity:1;}}
 
-/* 对话输入 —— 一个合成框:顶行状态/用量,中间 textarea,底行 模型 + 深度思考 + 发送。
+/* 对话输入(web):工具条一行 + 输入行一行,textarea 自带边框。
+   完整 web 应用里模型/待办/连接态都在顶栏和 chat-head,这里不必挤成合成框。 */
+.chat-input-wrap{border-top:1px solid var(--line);}
+.chat-input-bar{display:flex;align-items:center;gap:6px;padding:6px 14px 0;}
+.chat-input{display:flex;align-items:flex-end;gap:9px;padding:8px 14px 12px;}
+.chat-input textarea{flex:1;resize:none;border:1px solid var(--line);border-radius:var(--r-sm);padding:10px 12px;
+  font-size:13.5px;font-family:inherit;line-height:1.5;max-height:120px;color:var(--text-1);background:var(--paper-2);outline:none;}
+.chat-input textarea:focus{border-color:var(--brand);background:var(--panel);}
+
+/* 对话输入(VSCode 侧边栏)—— 一个合成框:顶行状态/用量,中间 textarea,底行 模型 + 深度思考 + 发送。
    外层 .composer 负责边框和焦点态,内部控件一律无边框透明,免得框里再套框。 */
 .composer-wrap{padding:10px 12px 12px;}
 .composer{display:flex;flex-direction:column;gap:6px;padding:8px 10px 8px;
