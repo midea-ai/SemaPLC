@@ -90,6 +90,16 @@ test('CSP meta 插在 head 里,且在资源标签之前', () => {
   assert.ok(html.includes('<head><meta http-equiv="Content-Security-Policy"'))
 })
 
+test('版本走 meta 注入,不传就不注入;引号被转义', () => {
+  // 空态那行 `sema-plc v0.1.0` 读的就是这个 meta;注入成 inline script 会连 nonce 一起
+  // 要回来,而 CSP 里刚把 nonce 拿掉。
+  assert.ok(!buildWebviewHtml(webview, WEB_ROOT, 'chat.html').includes('semaplc-version'))
+  const html = buildWebviewHtml(webview, WEB_ROOT, 'chat.html', '0.1.0')
+  assert.ok(html.includes('<meta name="semaplc-version" content="0.1.0">'))
+  const evil = buildWebviewHtml(webview, WEB_ROOT, 'chat.html', '1.0" onload="x')
+  assert.ok(!/content="1\.0" onload=/.test(evil), '引号必须转义,否则 meta 标签被撑开')
+})
+
 test('resolveWebRoot 认 media/web,认不出就返回 undefined', () => {
   const ext = path.join(tmp, 'ext')
   fs.mkdirSync(path.join(ext, 'media', 'web'), { recursive: true })

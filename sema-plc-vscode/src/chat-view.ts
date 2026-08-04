@@ -6,7 +6,7 @@ import { buildWebviewHtml, resolveWebRoot } from './webview-host'
 export const CHAT_VIEW_ID = 'semaplc.chat'
 
 /**
- * 活动栏里的对话侧边栏。
+ * 辅助侧边栏(Secondary Side Bar)里的对话视图。
  *
  * 它同时是 server 的懒启动触发点:视图被 resolve 意味着用户打开过这个侧栏(VSCode 只
  * 恢复用户主动打开过的视图),而扩展激活本身不该碰 server —— 否则装了插件的每个窗口
@@ -54,7 +54,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       this.bus.connect(ports.wsPort)
       this.lastWsPort = ports.wsPort
       // html 一赋值 webview 就从头加载,随后它自己发 view:ready,重放由那里触发。
-      view.webview.html = buildWebviewHtml(view.webview, webRoot, 'chat.html')
+      view.webview.html = buildWebviewHtml(view.webview, webRoot, 'chat.html', this.ctx.extension.packageJSON?.version)
       // 先摘旧订阅再挂新的。Bus.attach 内部也守了一道,这里摘是为了不让 attach 出来的
       // Disposable 无限堆在 ctx.subscriptions 上(那份只有扩展停用时才清)。
       this.attached?.dispose()

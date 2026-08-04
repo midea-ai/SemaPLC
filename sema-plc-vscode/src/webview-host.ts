@@ -21,7 +21,7 @@ export function resolveWebRoot(extensionPath: string): string | undefined {
  * (例如要 fetch /api/check 的梯形图预览),那条 connect-src 应该按入口单独放开,
  * 而不是在这里对所有 webview 统一开口。
  */
-export function buildWebviewHtml(webview: vscode.Webview, webRoot: string, htmlFile: string): string {
+export function buildWebviewHtml(webview: vscode.Webview, webRoot: string, htmlFile: string, version?: string): string {
   const raw = fs.readFileSync(path.join(webRoot, htmlFile), 'utf8')
 
   const rewritten = raw.replace(/\b(src|href)="([^"]+)"/g, (whole, attr: string, url: string) => {
@@ -42,6 +42,10 @@ export function buildWebviewHtml(webview: vscode.Webview, webRoot: string, htmlF
     `font-src ${webview.cspSource}`,
   ].join('; ')
 
-  const meta = `<meta http-equiv="Content-Security-Policy" content="${csp}">`
+  // 版本走 meta 而不是注入一段 inline script:后者要连 nonce 一起加回来,而空态那行
+  // 版本号读一个静态字符串就够。version 来自自家 package.json,仍过一道引号转义。
+  const meta =
+    `<meta http-equiv="Content-Security-Policy" content="${csp}">` +
+    (version ? `<meta name="semaplc-version" content="${version.replace(/"/g, '&quot;')}">` : '')
   return rewritten.includes('<head>') ? rewritten.replace('<head>', `<head>${meta}`) : meta + rewritten
 }
