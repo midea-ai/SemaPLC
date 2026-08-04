@@ -155,6 +155,8 @@ export type ServerMessage =
   | { type: 'agent:tool-start'; toolId: string; name: string; input: unknown }
   | { type: 'agent:tool-complete'; toolId: string; name: string; result: unknown; isError: boolean; title?: string; input?: unknown }
   | { type: 'agent:todos'; todos: TodoItem[] }
+  // 上下文用量（sema-core conversation:usage,每次 AI 响应完成后更新）
+  | { type: 'agent:usage'; useTokens: number; maxTokens: number }
   // agent 块协议（结构化渲染）。所有块事件带 turnId——中途加入的客户端要能懒建 turn 容器。
   | { type: 'agent:turn-start'; turnId: string }
   | { type: 'agent:block-start'; turnId: string; blockId: string; kind: 'thinking' | 'text' | 'tool'; toolName?: string; input?: unknown }
@@ -164,7 +166,11 @@ export type ServerMessage =
   // 当前 turn 快照——新客户端连接时由 bridge 应答广播（不进 sticky，见 ws-gateway/sema-bridge）
   | { type: 'agent:turn-snapshot'; turn: SerializedTurn | null }
   // plc
-  | { type: 'plc:state'; status: PlcStatus }
+  // status='ERROR' 是二义的:runtime 不可达(容器没起)和编译/装载失败都是它。
+  // reachable=false 专指前者,消费端据此区分「PLC 离线」与「编译错误」。
+  // 只有轮询的 plc-monitor 知道可达性,plc-controller/bridge 的 emit 不带该字段
+  // ⇒ 约定 undefined 按 true 处理(那几处 emit 时链路必然已通)。
+  | { type: 'plc:state'; status: PlcStatus; reachable?: boolean }
   | { type: 'plc:variables'; map: VariableEntry[] }
   | { type: 'plc:values'; values: Record<string, VariableValue> }
   | { type: 'plc:runtime-error'; errors: RuntimeError[] }
@@ -179,6 +185,32 @@ export type ServerMessage =
   | { type: 'error'; message: string }
   // P2 reserved
   | { type: 'permission:request'; requestId: string; toolName: string; input: unknown }
+
+/**
+ * 带状态的消息类型:缓存起来重放给后加入的客户端,否则它只能等下一次状态变化才知道现状。
+ *
+ * 住在 shared/ 而不是 ws-gateway.ts,是因为有两个消费者:server 的 WsGateway(重放给新
+ * 连上的 WS 客户端),以及 VSCode 扩展的 bus.ts(它只有一条常驻 WS,webview 重建时并不
+ * 会重连 server,所以必须自己存一份重放给新建的 webview)。扩展绝不能 import ws-gateway
+ * —— 那会把整个 server 依赖树打进 extension.js。
+ */
+export const STICKY_TYPES = new Set<ServerMessage['type']>([
+  'workspace:ready',
+  'plc:state',
+  'plc:variables',
+  'plc:values',
+  'editor:files',
+  'editor:open',
+  'agent:state',
+  'agent:todos',
+  'agent:usage',
+  'scene:ready',
+  'model:config',
+  // 重连(server 重启/窗口 reload/扩展 reload)后客户端 forced 集会清空,而运行时里
+  // 的强制仍然生效 ⇒ 用户再也解不掉。它是增量事件,直接 sticky 只能恢复最后一次操作,
+  // 所以 WsGateway 存的是累积出来的等价快照,见其 dispatch。
+  'plc:force-result',
+])
 
 // Type guards
 export function isClientMessage(x: unknown): x is ClientMessage {

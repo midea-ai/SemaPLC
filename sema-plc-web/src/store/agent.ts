@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
-import type { WsClient } from '../ws/client'
+import type { WsClientLike } from '../ws/client'
 import type { TodoItem, AgentBlock, SerializedTurn, ServerMessage, ToolBlockResult } from '../../shared/protocol'
 
 export type ChatMessage =
@@ -14,6 +14,7 @@ interface AgentStore {
   messages: ChatMessage[]
   state: 'idle' | 'processing'
   todos: TodoItem[]
+  usage: { useTokens: number; maxTokens: number } | null
   sessionId: string | null
   appendUser: (text: string) => void
   setState: (s: 'idle' | 'processing') => void
@@ -40,17 +41,32 @@ function updateBlock(blocks: AgentBlock[], blockId: string, fn: (b: AgentBlock) 
 // 持久化——那些由后端 turn-snapshot 在重连时恢复,避免刷新后卡死在 streaming 状态。
 // 浏览器外的环境（如 node 测试）没有 localStorage → 退化为内存 noop，避免 persist 崩。
 const noopStorage = { getItem: () => null, setItem: () => {}, removeItem: () => {} }
-// ponytail: 流式输出每个 delta 都触发 persist，throttle 避免主线程压力
+// ponytail: 流式输出每个 delta 都触发 persist，throttle 避免主线程压力。
+// 只有尾沿写入 → 关页面/刷新落在窗口内会丢最后一批消息,故在 pagehide 同步 flush
+// (pagehide 而非 beforeunload:移动端/后台标签只有前者可靠触发)。
+export const flushAgentPersist = (): void => pendingFlush?.()
+let pendingFlush: (() => void) | null = null
+
 function throttledStorage(base: Storage) {
   let timer: ReturnType<typeof setTimeout> | null = null
   let pending: [string, string] | null = null
+  const write = () => {
+    if (timer) { clearTimeout(timer); timer = null }
+    if (pending) { base.setItem(pending[0], pending[1]); pending = null }
+  }
+  pendingFlush = write
+  if (typeof window !== 'undefined') {
+    window.addEventListener('pagehide', write)
+    // webview 面板隐藏/销毁不发 pagehide,visibilitychange 是那里唯一可靠的信号
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') write() })
+  }
   return {
     getItem: (k: string) => base.getItem(k),
     setItem: (k: string, v: string) => {
       pending = [k, v]
-      if (!timer) timer = setTimeout(() => { if (pending) base.setItem(pending[0], pending[1]); pending = null; timer = null }, 300)
+      if (!timer) timer = setTimeout(write, 300)
     },
-    removeItem: (k: string) => base.removeItem(k),
+    removeItem: (k: string) => { pending = null; base.removeItem(k) },
   }
 }
 const MAX_HISTORY = 60
@@ -60,13 +76,14 @@ export const useAgentStore = create<AgentStore>()(
       messages: [],
       state: 'idle',
       todos: [],
+      usage: null,
       sessionId: null,
       setTodos: (todos) => set({ todos }),
       appendUser: (text) => set((s) => ({
         messages: [...s.messages, { id: `u-${Date.now()}`, kind: 'user', text, ts: Date.now() }],
       })),
       setState: (state) => set({ state }),
-      clear: () => set({ messages: [], state: 'idle', todos: [], sessionId: null }),
+      clear: () => set({ messages: [], state: 'idle', todos: [], usage: null, sessionId: null }),
     }),
     {
       name: 'semaplc:agent-chat',
@@ -177,13 +194,16 @@ export function handleAgentWsMessage(m: ServerMessage): void {
     case 'agent:todos':
       st.getState().setTodos(m.todos)
       break
+    case 'agent:usage':
+      st.setState({ usage: { useTokens: m.useTokens, maxTokens: m.maxTokens } })
+      break
     case 'error':
       st.setState((s) => ({ messages: [...s.messages, { id: `e-${Date.now()}`, kind: 'error', text: m.message, ts: Date.now() }] }))
       break
     case 'workspace:ready':
       // 同 sessionId = 同会话的 WS 重连（sticky 重放）→ 不清空（spec H4）；
       // sessionId 变化 = reset/switch 后的新会话 → 清空。
-      st.setState((s) => s.sessionId === m.sessionId ? {} : { messages: [], todos: [], state: 'idle', sessionId: m.sessionId })
+      st.setState((s) => s.sessionId === m.sessionId ? {} : { messages: [], todos: [], state: 'idle', usage: null, sessionId: m.sessionId })
       // 首次（sessionId 为 null）也走上面分支完成记录
       break
     case 'workspace:switching':
@@ -192,6 +212,6 @@ export function handleAgentWsMessage(m: ServerMessage): void {
   }
 }
 
-export function subscribeAgentToWs(client: WsClient) {
+export function subscribeAgentToWs(client: WsClientLike) {
   client.on(handleAgentWsMessage)
 }

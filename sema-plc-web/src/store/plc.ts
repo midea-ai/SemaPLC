@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { WsClient } from '../ws/client'
+import type { WsClientLike } from '../ws/client'
 import type { PlcStatus, VariableEntry, VariableValue, RuntimeError } from '../../shared/protocol'
 
 interface PlcStore {
@@ -43,7 +43,7 @@ export const usePlcStore = create<PlcStore>((set) => ({
   clear: () => set({ status: 'EMPTY', variableMap: [], values: {}, runtimeErrors: [], forced: new Set(), forcing: new Set() }),
 }))
 
-export function subscribePlcToWs(client: WsClient) {
+export function subscribePlcToWs(client: WsClientLike) {
   client.on((m) => {
     switch (m.type) {
       case 'plc:state':

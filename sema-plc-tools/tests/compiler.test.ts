@@ -8,9 +8,27 @@ describe('parseIec2cErrors', () => {
     const stderr = 'program.st:5:10-5:20: error: Undefined symbol FOO\nprogram.st:7:1-7:5: warning: Unused variable BAR'
     const result = parseIec2cErrors(stderr)
     expect(result).toEqual<Iec2cError[]>([
-      { line: 5, col: 10, message: 'Undefined symbol FOO', severity: 'error', sourceLine: '' },
-      { line: 7, col: 1, message: 'Unused variable BAR', severity: 'warning', sourceLine: '' },
+      { line: 5, col: 10, endLine: 5, endCol: 20, message: 'Undefined symbol FOO', severity: 'error', sourceLine: '' },
+      { line: 7, col: 1, endLine: 7, endCol: 5, message: 'Unused variable BAR', severity: 'warning', sourceLine: '' },
     ])
+  })
+
+  // 末端行列决定诊断波浪线的长度。matiec 的区间是闭的:`12-5..12-22` 对应 caret 行
+  // `^~~~~~~~~~~~~~~~~~` 正好 18 列(5..22 含两端),所以 endCol 不能当半开区间用。
+  it('captures the end position of the reported range', () => {
+    const stCode = ['PROGRAM main', 'VAR', '    counter : INT := 0;', 'END_VAR', 'END_PROGRAM'].join('\n')
+    const stderr = 'program.st:3-5..3-22: error: invalid located variable declaration.'
+    const [e] = parseIec2cErrors(stderr, stCode)
+    expect(e.col).toBe(5)
+    expect(e.endLine).toBe(3)
+    expect(e.endCol).toBe(22)
+    // 闭区间的右端确实落在 token 内(第 22 列是 ';' 前的最后一个字符)
+    expect(e.sourceLine.slice(e.col - 1, e.endCol)).toBe('counter : INT := 0')
+  })
+
+  it('captures a range that spans multiple lines', () => {
+    const [e] = parseIec2cErrors('program.st:12-5..14-9: error: unclosed block.')
+    expect(e).toMatchObject({ line: 12, col: 5, endLine: 14, endCol: 9 })
   })
 
   it('attaches the offending source line when stCode is provided', () => {

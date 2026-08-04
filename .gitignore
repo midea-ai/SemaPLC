@@ -22,6 +22,10 @@ coverage/
 .env
 .env.local
 
+# 运行时用户数据(服务从仓库根启动,写在 cwd)
+custom-models.json
+key-overrides.json
+
 # brainstorm visual companion sessions
 .superpowers/
 
@@ -37,6 +41,8 @@ related-benchmarks/
 *.png
 # 但 README logo 等需入库
 !docs/images/*
+# VSCode 插件图标(package.json 的 icon 字段指向它,缺了 vsce package 会失败)
+!sema-plc-vscode/images/*
 
 # 草稿 / 临时仿真文件
 **/.review-design.md
@@ -49,6 +55,13 @@ session-analysis/
 # 临时调试抓包产物(GLM 请求/响应复现等),不入库
 tmp/
 
-# 文档目录不纳入版本库(README logo 资产除外,见上方 !docs/images/*)
-docs/
+# docs/ 只纳入 docsify 文档站文件与 logo 资产,其余草稿不入库
+docs/*
 !docs/images/
+!docs/index.html
+!docs/style.css
+!docs/_sidebar.md
+!docs/README.md
+!docs/.nojekyll
+!docs/wiki/
+!docs/en/

@@ -12,6 +12,7 @@ import {
   writeStFile,
   resolvePlcToolsCli,
   substituteTokens,
+  checkWorkspaceTarget,
 } from '../../server/workspace-setup.js'
 
 const TMP_WS = path.join(os.tmpdir(), `plc-vis-ws-test-${Date.now()}-${randomUUID()}`)
@@ -116,6 +117,52 @@ describe('readStFile / writeStFile', () => {
     const f = path.join(TMP_WS, 'a', 'b.st')
     writeStFile(f, 'PROGRAM x END_PROGRAM')
     expect(readStFile(f)).toBe('PROGRAM x END_PROGRAM')
+  })
+})
+
+// 切换工作区的唯一守卫。认领一个有内容的普通目录之后,setupWorkspaceIfNeeded 往里铺模板,
+// 「重置」的 cleanWorkspace 把顶层全部 rm -rf —— 用户的仓库两次点击就没了。
+describe('checkWorkspaceTarget', () => {
+  const at = (name: string) => path.join(TMP_WS, name)
+
+  it('放行:目录不存在(将新建)', () => {
+    expect(checkWorkspaceTarget(at('brand-new'))).toBeNull()
+  })
+
+  it('放行:空目录', () => {
+    fs.mkdirSync(at('empty'), { recursive: true })
+    expect(checkWorkspaceTarget(at('empty'))).toBeNull()
+  })
+
+  it('放行:只有 .DS_Store 的目录仍算空(Finder 逛一圈就会生成)', () => {
+    fs.mkdirSync(at('finder'), { recursive: true })
+    fs.writeFileSync(path.join(at('finder'), '.DS_Store'), '')
+    expect(checkWorkspaceTarget(at('finder'))).toBeNull()
+  })
+
+  it('放行:已是 PLC 工作区(有 .sema/.mcp.json),哪怕里面装满了生成物', () => {
+    fs.mkdirSync(path.join(at('seeded'), '.sema'), { recursive: true })
+    fs.writeFileSync(path.join(at('seeded'), '.sema', '.mcp.json'), '{}')
+    fs.writeFileSync(path.join(at('seeded'), 'main.st'), 'PROGRAM x END_PROGRAM')
+    expect(checkWorkspaceTarget(at('seeded'))).toBeNull()
+  })
+
+  it('拒绝:用户的代码仓库 —— 这是 rm -rf 删库那条路的入口', () => {
+    fs.mkdirSync(path.join(at('my-app'), '.git'), { recursive: true })
+    fs.writeFileSync(path.join(at('my-app'), 'package.json'), '{}')
+    expect(checkWorkspaceTarget(at('my-app'))).toMatch(/既不是空目录/)
+  })
+
+  it('拒绝:顶层有 .st 但没建过工程的目录(.st 不是本产品独占的扩展名)', () => {
+    fs.mkdirSync(at('smalltalk'), { recursive: true })
+    fs.writeFileSync(path.join(at('smalltalk'), 'Foo.st'), '')
+    expect(checkWorkspaceTarget(at('smalltalk'))).not.toBeNull()
+  })
+
+  it('拒绝:目标是文件而不是目录', () => {
+    fs.mkdirSync(TMP_WS, { recursive: true })
+    fs.writeFileSync(at('a-file'), 'x')
+    expect(checkWorkspaceTarget(at('a-file'))).toMatch(/不是目录/)
   })
 })
 

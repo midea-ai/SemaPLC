@@ -11,6 +11,10 @@ export const stHighlighting = styleTags({
   Identifier: t.variableName,
   Variable: t.variableName,
 
+  // 直接地址 %IX0.0 —— 图上用红笔标的 IO 点位,单独给个 tag 才能上色
+  DirectAddress: t.attributeName,
+  AT: t.modifier,
+
   // Literals
   Number: t.number,
   Boolean: t.bool,

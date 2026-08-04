@@ -1,6 +1,6 @@
 import { SemaCore } from 'sema-core'
 import { bus } from './event-bus.js'
-import { setupWorkspaceIfNeeded, scanStFiles, scanProjectFiles, isProjectFile, readStFile, writeStFile } from './workspace-setup.js'
+import { setupWorkspaceIfNeeded, scanStFiles, scanProjectFiles, isProjectFile, readStFile, writeStFile, checkWorkspaceTarget } from './workspace-setup.js'
 import { readPlcState, plcStateFileForWorkspace } from './state-reader.js'
 import { BlockMapper } from './block-mapper.js'
 import { validateSceneSpec } from '../../sema-plc-tools/dist/tools/sceneSpec.js'
@@ -18,6 +18,10 @@ export class SemaBridge {
   // sema-core 2.0.5: session-level API (processUserInput / interrupt / on / dispose /
   // respondTo*) moved from SemaCore onto the SemaSession returned by createSession().
   private session: any = null
+  // sema-core 里到底有没有注册过模型。不用 currentModelConfigState().active 判断:那是
+  // 从 env 纯算出来的,和 sema-core 的真实状态可能不一致(addModel 失败时)。这个字段只在
+  // applyModel 真正跑完后才为 true。
+  private modelReady = false
   private workspace: string
   private sessionId: string | null = null
   private currentStPath: string | null = null
@@ -235,6 +239,10 @@ export class SemaBridge {
     this.session.on('session:interrupted', () => {
       this.mapper?.onInterrupted()
     })
+    // 每次 AI 响应完成后触发 → 前端输入栏的上下文用量指示
+    this.session.on('conversation:usage', (d: { usage: { useTokens: number; maxTokens: number } }) => {
+      if (d?.usage) bus.emit({ type: 'agent:usage', useTokens: d.usage.useTokens, maxTokens: d.usage.maxTokens })
+    })
 
     // Defensive: if a permission request slips through (e.g. sema-core adds a
     // new permission class we haven't accounted for), auto-agree so the
@@ -268,6 +276,18 @@ export class SemaBridge {
     if (!('type' in m)) return
     switch (m.type) {
       case 'internal:user-input':
+        // 没模型就别往下走。createSession() 在无 key 时照样成功,session 存在,于是
+        // processUserInput 会开一个永远不结束的 turn —— UI 卡在「处理中…」转到天荒地老,
+        // 而唯一的解释(resolveModel 那条 log)早在 WS 连上之前就发完了,且不是 sticky。
+        // 挡在这里而不是各个客户端各挡一次:所有输入入口都汇到这一条。
+        if (!this.modelReady) {
+          bus.emit({ type: 'agent:user-input-received', text: m.text })
+          bus.emit({
+            type: 'error',
+            message: '尚未配置可用的模型 API Key,消息没有发出。请先在设置里填入当前模型对应的 *_API_KEY(VSCode:侧边栏标题栏 ⚙ → 设置 LLM API Key)。',
+          })
+          break
+        }
         bus.emit({ type: 'agent:user-input-received', text: m.text })
         this.session?.processUserInput(m.text)
         break
@@ -471,6 +491,7 @@ export class SemaBridge {
     if (!this.core) throw new Error('SemaCore is not initialized')
     await (this.core as any).addModel(model.cfg, true)
     await (this.core as any).applyTaskModel({ main: model.id, quick: model.id })
+    this.modelReady = true
     bus.emit({ type: 'log', ts: Date.now(), source: 'system', level: 'info', message: `model: ${model.id}` })
   }
 
@@ -727,6 +748,14 @@ export class SemaBridge {
   }
 
   private async switchWorkspace(newPath: string): Promise<void> {
+    const target = path.resolve(newPath)
+    // 守卫必须在 workspace:switching 之前:那条广播一发,前端就清空 store 并把顶栏锁进
+    // switching 态,而这里根本不打算切过去。
+    const rejected = checkWorkspaceTarget(target)
+    if (rejected) {
+      this.emitLog('system', 'error', `切换工作区被拒绝:${rejected}`)
+      return
+    }
     bus.emit({ type: 'workspace:switching' })
     try {
       if (this.session) { try { this.core?.closeSession(this.session.sessionId) } catch {}; this.session = null }; await this.core?.dispose()
@@ -743,7 +772,7 @@ export class SemaBridge {
     this.mapper = null
     this.sessionId = null
     this.currentStPath = null
-    this.workspace = path.resolve(newPath)
+    this.workspace = target
     await this.start()
   }
 

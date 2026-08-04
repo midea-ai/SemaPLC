@@ -110,6 +110,37 @@ describe('WsGateway', () => {
     await new Promise(r => setTimeout(r, 20))
   })
 
+  // 重连后要能解掉运行时里仍生效的强制 ⇒ 重放的必须是累积后的全集,
+  // 直接 sticky 原事件只会恢复最后一次操作(这里就是 release A,forced 空)。
+  it('replays the accumulated forced set to a reconnecting client', async () => {
+    const port = TEST_PORT + 3
+    const g = new WsGateway({ port })
+
+    const fr = (forced: string[], released: string[]) =>
+      bus.emit({ type: 'plc:force-result', forced, released, failed: [], error: null })
+    fr(['a'], [])
+    fr(['b'], [])
+    fr([], ['a'])
+
+    const received: any[] = []
+    const c = new WebSocket(`ws://127.0.0.1:${port}`)
+    c.on('message', (d) => received.push(JSON.parse(d.toString())))
+    await new Promise<void>((resolve, reject) => {
+      c.on('open', () => resolve())
+      c.on('error', reject)
+    })
+    await new Promise(r => setTimeout(r, 50))
+
+    const replay = received.find(m => m.type === 'plc:force-result')
+    expect(replay).toBeDefined()
+    expect([...replay.forced].sort()).toEqual(['b'])
+    expect(replay.released).toEqual([])
+
+    c.close()
+    g.close()
+    await new Promise(r => setTimeout(r, 20))
+  })
+
   it('invokes onConnect / onDisconnect callbacks per connection', async () => {
     let connectCount = 0
     let disconnectCount = 0

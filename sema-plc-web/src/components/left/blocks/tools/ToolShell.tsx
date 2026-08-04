@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from 'react'
 import type { ToolCardData } from '../ToolCallCard'
+import { Caret } from '../Caret'
 import { useT } from '../../../../i18n'
 
 function StatusIcon({ status }: { status: ToolCardData['status'] }) {
@@ -21,7 +22,7 @@ export function ToolShell(
         <StatusIcon status={data.status} />
         <span className="tool-name">{label}</span>
         {sub && <span className="tool-sub">{sub}</span>}
-        <span className="tool-caret">{open ? '▾' : '▸'}</span>
+        <Caret open={open} />
       </button>
       {open && <div className="tool-rich-body">{children}</div>}
     </div>

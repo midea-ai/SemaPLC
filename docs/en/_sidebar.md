@@ -1,0 +1,30 @@
+- **Overview**
+  - [Project Overview](en/wiki/overview/project)
+  - [Architecture](en/wiki/overview/architecture)
+- **Usage**
+  - [Quick Start](en/wiki/getting-started/quick-start)
+  - [Model Configuration](en/wiki/getting-started/model-config)
+- **Toolchain: sema-plc-tools**
+  - [MCP Tools Reference](en/wiki/tools/mcp-tools)
+  - [Standalone CLI](en/wiki/tools/cli)
+  - Internals
+    - [Compile & Deploy Pipeline](en/wiki/tools/compile-pipeline)
+    - [Syntax Check & IO Detection](en/wiki/tools/check-and-io)
+    - [Runtime Client & Debug Protocol](en/wiki/tools/runtime-client)
+    - [Observation & Verification Tools](en/wiki/tools/observation)
+    - [Declarative Verify Runner](en/wiki/tools/verify-runner)
+    - [Process Simulation & Scene Spec](en/wiki/tools/simulation)
+    - [State, Config & Safety Boundaries](en/wiki/tools/state-config)
+  - [OpenPLC Runtime Environment](en/wiki/tools/runtime)
+- **Web IDE: sema-plc-web**
+  - [Backend Overview](en/wiki/web/backend)
+  - Backend Internals
+    - [SemaBridge: Embedded Agent](en/wiki/web/sema-bridge)
+    - [Model System](en/wiki/web/model-system)
+    - [Realtime Channel & WS Protocol](en/wiki/web/realtime)
+  - [Frontend Overview](en/wiki/web/frontend)
+  - Frontend Internals
+    - [ST → Ladder Transformer](en/wiki/web/ladder-transformer)
+    - [ST Language Support (Editor)](en/wiki/web/st-language)
+    - [Chat Panel & Tool Cards](en/wiki/web/chat-ui)
+  - [Workspace & Skills](en/wiki/web/workspace)

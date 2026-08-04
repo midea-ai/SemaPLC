@@ -103,6 +103,25 @@ describe('validateSceneSpec', () => {
     expect(r.ok).toBe(false)
     expect(r.errors.join(' ')).toMatch(/visible.*when/i)
   })
+  // 前端只给库部件画外层 label;custom 是整幅自绘画面,写在 label 上的标题会静默消失
+  it('warns that a custom part label is not rendered (title must live inside the svg)', () => {
+    const spec: SceneSpec = { ...GOOD, parts: [{
+      id: 'c', kind: 'custom', x: 0, y: 0, label: '分拣线',
+      svg: '<svg viewBox="0 0 10 10"><circle id="a"/></svg>',
+      bindings: [{ variable: 'red_led', target: 'a', effect: { type: 'fill', map: [{ when: { eq: true }, color: '#fff' }] } }],
+    }] }
+    const r = validateSceneSpec(spec, ['red_led'])
+    expect(r.ok).toBe(true)                       // 只是提醒,不阻塞生成
+    expect(r.warnings.join(' ')).toMatch(/label.*不会渲染/)
+  })
+  it('does not warn about label on a library part', () => {
+    const spec: SceneSpec = { ...GOOD, parts: [{
+      id: 'l', kind: 'lamp', x: 0, y: 0, label: '红灯',
+      bindings: [{ variable: 'red_led', effect: { type: 'fill', map: [{ when: { eq: true }, color: '#fff' }] } }],
+    }] }
+    const r = validateSceneSpec(spec, ['red_led'])
+    expect(r.warnings.join(' ')).not.toMatch(/不会渲染/)
+  })
   it('rejects a custom part with no svg', () => {
     const bad: SceneSpec = { ...GOOD, parts: [{ id: 'c', kind: 'custom', x: 0, y: 0, bindings: [] }] }
     const r = validateSceneSpec(bad, [])

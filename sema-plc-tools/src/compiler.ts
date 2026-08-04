@@ -5,6 +5,7 @@ import { execFile } from 'child_process'
 import { promisify } from 'util'
 import type { CompileResult, Iec2cError } from './types.js'
 import { adviceForIec2cError } from './tools/iec2cErrorParser.js'
+import { dockerBin } from './config.js'
 
 const execFileAsync = promisify(execFile)
 
@@ -22,19 +23,23 @@ export type ExecFn = (
 // Parse matiec error format. Real matiec emits: file:line-col..line-col: severity: message
 // Older/alternate form: file:line:col-line:col: severity: message — both accepted.
 export function parseIec2cErrors(stderr: string, stCode?: string): Iec2cError[] {
-  const pattern = /^\S+:(\d+)[-:](\d+)(?:\.\.|-)\d+[-:]\d+:\s+(error|warning):\s+(.+)$/gm
+  // 末端行列一直在匹配范围内,只是以前用 \d+ 吞掉没捕获。捕出来诊断的波浪线才能盖住整个
+  // token,否则只能退化成 col 处的一个点。
+  const pattern = /^\S+:(\d+)[-:](\d+)(?:\.\.|-)(\d+)[-:](\d+):\s+(error|warning):\s+(.+)$/gm
   const srcLines = stCode?.split('\n')
   const errors: Iec2cError[] = []
   let m: RegExpExecArray | null
   while ((m = pattern.exec(stderr)) !== null) {
     const line = parseInt(m[1], 10)
-    const message = m[4].trim()
+    const message = m[6].trim()
     const sourceLine = (srcLines?.[line - 1] ?? '').replace(/\r$/, '')
     const advice = adviceForIec2cError(message, sourceLine)
     errors.push({
       line,
       col: parseInt(m[2], 10),
-      severity: m[3] as 'error' | 'warning',
+      endLine: parseInt(m[3], 10),
+      endCol: parseInt(m[4], 10),
+      severity: m[5] as 'error' | 'warning',
       message,
       sourceLine,
       ...(advice ? { advice } : {}),
@@ -121,6 +126,7 @@ export function makeCompileScriptForTest(): string {
 }
 
 async function realExec(stCode: string, container: string): Promise<ExecResult> {
+  const bin = dockerBin()
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'plc-host-'))
   const stFile = path.join(tmpDir, 'program.st')
   const scriptFile = path.join(tmpDir, 'compile.sh')
@@ -130,12 +136,12 @@ async function realExec(stCode: string, container: string): Promise<ExecResult> 
     fs.writeFileSync(scriptFile, makeCompileScript(), { mode: 0o755 })
 
     // Copy ST file and script into container
-    await execFileAsync('docker', ['cp', stFile, `${container}:/tmp/program_input.st`])
-    await execFileAsync('docker', ['cp', scriptFile, `${container}:/tmp/plc_compile.sh`])
-    await execFileAsync('docker', ['exec', container, 'chmod', '+x', '/tmp/plc_compile.sh'])
+    await execFileAsync(bin, ['cp', stFile, `${container}:/tmp/program_input.st`])
+    await execFileAsync(bin, ['cp', scriptFile, `${container}:/tmp/plc_compile.sh`])
+    await execFileAsync(bin, ['exec', container, 'chmod', '+x', '/tmp/plc_compile.sh'])
 
     const { stdout, stderr } = await execFileAsync(
-      'docker',
+      bin,
       ['exec', container, '/tmp/plc_compile.sh', '/tmp/program_input.st'],
       // timeout:docker/容器卡死时不无限挂起(matiec 编译正常秒级;挂死曾把整个
       // buildAndRun 拖到外部 SIGTERM,真因被误报成 interrupted)。

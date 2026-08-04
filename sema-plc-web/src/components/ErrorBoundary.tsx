@@ -28,14 +28,14 @@ export class ErrorBoundary extends Component<Props, State> {
   render() {
     if (this.state.error) {
       return (
-        <div style={{ padding: 16, color: '#b91c1c', fontSize: 13, display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'flex-start' }}>
+        <div style={{ padding: 16, color: 'var(--err)', fontSize: 13, display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'flex-start' }}>
           <strong>⚠ {this.props.label ?? t('common.errorBoundary.defaultLabel')}</strong>
-          <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontSize: 12, color: '#7f1d1d', background: '#fef2f2', padding: '8px 10px', borderRadius: 6, maxWidth: '100%' }}>
+          <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontSize: 12, color: 'var(--err)', background: '#FBECEA', padding: '8px 10px', borderRadius: 2, maxWidth: '100%' }}>
             {this.state.error.message}
           </pre>
           <button
             onClick={this.reset}
-            style={{ fontSize: 12, padding: '4px 12px', borderRadius: 6, border: '1px solid #d1d5db', background: '#fff', cursor: 'pointer' }}
+            style={{ fontSize: 12, padding: '4px 12px', borderRadius: 2, border: '1px solid var(--line)', background: 'var(--panel)', cursor: 'pointer' }}
           >
             {t('common.retry')}
           </button>

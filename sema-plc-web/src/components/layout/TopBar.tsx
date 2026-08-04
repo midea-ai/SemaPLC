@@ -4,7 +4,10 @@ import { usePlcStore } from '../../store/plc'
 import { useEditorStore } from '../../store/editor'
 import { useWsConnection } from '../../ws/useWsConnection'
 import { useT, useLang, setLang } from '../../i18n'
+import { confirmDialog } from '../../lib/confirmDialog'
 import { ModelPanel } from './ModelPanel'
+import { readTheme, applyTheme, type Theme } from '../../theme'
+import type { LayoutMode } from '../../App'
 
 type Tone = 'ok' | 'idle' | 'warn' | 'err'
 const TONE: Record<Tone, string> = { ok: 'var(--ok)', idle: 'var(--text-3)', warn: 'var(--warn)', err: 'var(--err)' }
@@ -18,7 +21,7 @@ function StatusDot({ tone, label, pulse }: { tone: Tone; label: string; pulse?: 
   )
 }
 
-export function TopBar() {
+export function TopBar({ layout, onToggleLayout }: { layout: LayoutMode; onToggleLayout: () => void }) {
   const t = useT()
   const lang = useLang()
   const workspace = useWorkspaceStore((s) => s.path)
@@ -31,6 +34,13 @@ export function TopBar() {
   const { send, status: wsStatus } = useWsConnection()
   const [editing, setEditing] = useState(false)
   const [pathInput, setPathInput] = useState('')
+  const [theme, setTheme] = useState<Theme>(readTheme)
+
+  const toggleTheme = () => {
+    const next: Theme = theme === 'sheet' ? 'modern' : 'sheet'
+    setTheme(next)
+    applyTheme(next)
+  }
 
   const submitSwitch = () => {
     if (pathInput.trim()) send({ type: 'workspace:switch', path: pathInput.trim() })
@@ -79,6 +89,23 @@ export function TopBar() {
 
       <div className="tb-right">
         <ModelPanel />
+        <button type="button" className="layout-toggle" onClick={onToggleLayout} title={t(layout === 'split' ? 'topbar.layout.columns' : 'topbar.layout.split')}>
+          {layout === 'split' ? (
+            <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><rect x="1" y="2" width="4.5" height="12" rx="1" fill="none" stroke="currentColor" strokeWidth="1.2"/><rect x="6.5" y="2" width="4" height="12" rx="1" fill="none" stroke="currentColor" strokeWidth="1.2"/><rect x="11.5" y="2" width="3.5" height="12" rx="1" fill="none" stroke="currentColor" strokeWidth="1.2"/></svg>
+          ) : (
+            <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><rect x="1" y="2" width="6" height="12" rx="1" fill="none" stroke="currentColor" strokeWidth="1.2"/><rect x="8" y="2" width="7" height="5" rx="1" fill="none" stroke="currentColor" strokeWidth="1.2"/><rect x="8" y="9" width="7" height="5" rx="1" fill="none" stroke="currentColor" strokeWidth="1.2"/></svg>
+          )}
+        </button>
+        <button type="button" className="layout-toggle" onClick={toggleTheme}
+          title={t(theme === 'sheet' ? 'topbar.theme.toModern' : 'topbar.theme.toSheet')}>
+          {theme === 'sheet' ? (
+            /* 图纸态:显示"换成圆角卡片"的去处 */
+            <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><rect x="1.5" y="2.5" width="13" height="11" rx="3" fill="none" stroke="currentColor" strokeWidth="1.2"/><circle cx="5" cy="8" r="1.6" fill="currentColor"/></svg>
+          ) : (
+            /* modern 态:显示"换成网格图纸"的去处 */
+            <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><rect x="1.5" y="2.5" width="13" height="11" fill="none" stroke="currentColor" strokeWidth="1.2"/><path d="M6 2.5v11M10.5 2.5v11M1.5 6.5h13M1.5 10h13" stroke="currentColor" strokeWidth=".8" opacity=".6"/></svg>
+          )}
+        </button>
         <div className="lang-toggle" role="group" aria-label="Language">
           <button type="button" className={lang === 'zh' ? 'active' : ''} aria-pressed={lang === 'zh'} onClick={() => setLang('zh')}>中</button>
           <button type="button" className={lang === 'en' ? 'active' : ''} aria-pressed={lang === 'en'} onClick={() => setLang('en')}>EN</button>
@@ -94,8 +121,10 @@ export function TopBar() {
           <button
             className="tb-btn reset"
             disabled={switching || wsStatus !== 'open'}
-            onClick={() => {
-              if (window.confirm(t('topbar.reset.confirm'))) {
+            onClick={async () => {
+              // 路径必须进确认框:重置删的是整个工作区目录,只说"会被删除"而不说删哪个,
+              // 用户没法判断自己点的是不是删库。
+              if (await confirmDialog(`${t('topbar.reset.confirm')}\n\n${workspace ?? '—'}`)) {
                 send({ type: 'session:reset' })
               }
             }}

@@ -8,7 +8,7 @@ import { readState, writeState } from '../state.js'
 import { detectIO, findUnassignedOutputs } from './detectIO.js'
 import { buildModbusSlaveConfig } from './modbusConfig.js'
 import type { CompileResult, VariableEntry } from '../types.js'
-import type { PlcConfig } from '../config.js'
+import { dockerBin, type PlcConfig } from '../config.js'
 import type { ExecFn } from '../compiler.js'
 
 const execFileAsync = promisify(execFile)
@@ -23,9 +23,9 @@ async function realInjectModbusConf(container: string, zipPath: string, configJs
   const tmp = path.join(os.tmpdir(), `modbus_slave_${process.pid}_${workDir.replace(/\W/g, '')}.json`)
   fs.writeFileSync(tmp, configJson, 'utf8')
   try {
-    await execFileAsync('docker', ['exec', container, 'mkdir', '-p', `${workDir}/conf`])
-    await execFileAsync('docker', ['cp', tmp, `${container}:${workDir}/conf/modbus_slave.json`])
-    await execFileAsync('docker', ['exec', container, 'bash', '-c', `cd "${workDir}" && zip -q "${zipPath}" conf/modbus_slave.json`])
+    await execFileAsync(dockerBin(), ['exec', container, 'mkdir', '-p', `${workDir}/conf`])
+    await execFileAsync(dockerBin(), ['cp', tmp, `${container}:${workDir}/conf/modbus_slave.json`])
+    await execFileAsync(dockerBin(), ['exec', container, 'bash', '-c', `cd "${workDir}" && zip -q "${zipPath}" conf/modbus_slave.json`])
   } finally {
     try { fs.unlinkSync(tmp) } catch {}
   }
@@ -93,7 +93,7 @@ export function normalizeCsv(raw: string): string {
 async function realReadCsv(container: string, zipPath: string): Promise<string> {
   // Derive the work dir from the zip path: same directory as the generated ZIP
   const workDir = path.posix.dirname(zipPath)
-  const { stdout: found } = await execFileAsync('docker', [
+  const { stdout: found } = await execFileAsync(dockerBin(), [
     'exec', container, 'bash', '-c',
     `cat "${workDir}/VARIABLES.csv" 2>/dev/null || echo ""`,
   ]).catch(() => ({ stdout: '' }))

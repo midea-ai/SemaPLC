@@ -93,3 +93,13 @@ describe('agent store setTodos (no title-dedup)', () => {
     expect(useAgentStore.getState().todos).toEqual(todos)
   })
 })
+
+describe('agent store: 上下文用量 (agent:usage)', () => {
+  it('agent:usage 更新 usage；新会话 workspace:ready 清空', () => {
+    h({ type: 'agent:usage', useTokens: 15000, maxTokens: 128000 })
+    expect(useAgentStore.getState().usage).toEqual({ useTokens: 15000, maxTokens: 128000 })
+    h({ type: 'workspace:ready', path: '/w', sessionId: 'S-new' })
+    h({ type: 'workspace:ready', path: '/w', sessionId: 'S-newer' })  // sessionId 变 → 清
+    expect(useAgentStore.getState().usage).toBeNull()
+  })
+})

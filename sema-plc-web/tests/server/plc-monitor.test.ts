@@ -67,4 +67,29 @@ describe('PlcMonitor', () => {
 
     expect(states).toEqual(['STOPPED', 'RUNNING'])
   })
+
+  // 去重键必须含 reachable:不可达时 status 也是 'ERROR',只比 status 的话
+  // 「容器没起」→「容器起来了但编译错」不会 emit,消费端永远卡在第一种含义上。
+  it('re-emits plc:state when reachability flips at an unchanged ERROR status', async () => {
+    const handleStatus = vi.fn()
+      .mockResolvedValueOnce({ status: 'ERROR', isRunning: false, runtimeReachable: false })
+      .mockResolvedValue({ status: 'ERROR', isRunning: false, runtimeReachable: true })
+    const handleReadVariables = vi.fn().mockResolvedValue({ success: true, variables: {}, unresolvedNames: [], errorMessage: null })
+
+    const { PlcMonitor } = await import('../../server/plc-monitor.js')
+    const { bus } = await import('../../server/event-bus.js')
+    const states: Array<{ status: string; reachable?: boolean }> = []
+    const off = bus.on((m) => { if (m.type === 'plc:state') states.push({ status: m.status, reachable: m.reachable }) })
+
+    const m = new PlcMonitor({ workspace: '/tmp/x', intervalMs: 10, _handleStatus: handleStatus, _handleReadVariables: handleReadVariables })
+    m.clientConnected()
+    await new Promise(r => setTimeout(r, 60))
+    m.stopPolling()
+    off()
+
+    expect(states).toEqual([
+      { status: 'ERROR', reachable: false },
+      { status: 'ERROR', reachable: true },
+    ])
+  })
 })

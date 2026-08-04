@@ -15,53 +15,55 @@ html, body, #root {
  *
  * Light theme — the lifted upstream is dark; we re-tone for a light UI.
  */
+/* 与 semaplc.css 的图纸调色板同源:纸/墨/图纸蓝。功能块不再一块一个颜色 ——
+   定时器族走蓝，计数器族走棕黄，元件类别自己就是分类,不需要彩虹。 */
 :root {
-  --color-background: #ffffff;
-  --color-surface: #f8fafc;
-  --color-elevated: #ffffff;
-  --color-toolbar: #94a3b8;
+  --color-background: #FAF9F6;
+  --color-surface: #F2F1EA;
+  --color-elevated: #FAF9F6;
+  --color-toolbar: #8B95A0;
 
-  --color-border: #cbd5e1;
-  --color-border-subtle: #e2e8f0;
-  --color-border-accent: #93c5fd;
+  --color-border: #B7B2A4;
+  --color-border-subtle: #D9D6CD;
+  --color-border-accent: #9DB4D8;
 
-  --color-foreground: #1e293b;
-  --color-muted: #64748b;
-  --color-muted-foreground: #94a3b8;
+  --color-foreground: #16202B;
+  --color-muted: #5A6875;
+  --color-muted-foreground: #8B95A0;
 
-  --color-accent: #4f46e5;
-  --color-accent-hover: #4338ca;
-  --color-accent-muted: rgba(79, 70, 229, 0.12);
+  --color-accent: #2C5AA0;
+  --color-accent-hover: #24497F;
+  --color-accent-muted: rgba(44, 90, 160, 0.12);
 
-  --color-accent-secondary: #ef4444;
-  --color-accent-warm: #f59e0b;
-  --color-accent-warm-hover: #d97706;
+  --color-accent-secondary: #C1442E;
+  --color-accent-warm: #B7791F;
+  --color-accent-warm-hover: #8A5A16;
 
-  --color-success: #22c55e;
-  --color-warning: #eab308;
-  --color-destructive: #ef4444;
-  --color-info: #2563eb;
+  --color-success: #2E7D52;
+  --color-warning: #B7791F;
+  --color-destructive: #C1442E;
+  --color-info: #2C5AA0;
 
-  --color-node-ton: #2563eb;
-  --color-node-tof: #8b5cf6;
-  --color-node-tp:  #14b8a6;
-  --color-node-ctu: #ef4444;
-  --color-node-ctd: #a78bfa;
-  --color-node-ctud:#f97316;
+  --color-node-ton: #2C5AA0;
+  --color-node-tof: #24497F;
+  --color-node-tp:  #4E7CBE;
+  --color-node-ctu: #B7791F;
+  --color-node-ctd: #8A5A16;
+  --color-node-ctud:#C1442E;
 
-  --color-minimap-contact: #2563eb;
-  --color-minimap-coil: #14b8a6;
-  --color-minimap-timer: #eab308;
-  --color-minimap-counter: #8b5cf6;
-  --color-minimap-comparator: #f97316;
-  --color-minimap-power-left: #ef4444;
-  --color-minimap-power-right: #2563eb;
-  --color-minimap-default: #94a3b8;
+  --color-minimap-contact: #2C5AA0;
+  --color-minimap-coil: #2E7D52;
+  --color-minimap-timer: #4E7CBE;
+  --color-minimap-counter: #B7791F;
+  --color-minimap-comparator: #8A5A16;
+  --color-minimap-power-left: #C1442E;
+  --color-minimap-power-right: #C1442E;
+  --color-minimap-default: #8B95A0;
 
   --font-sans: 'Inter', 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
-  --radius-sm: 4px;
-  --shadow-glow: 0 0 12px rgba(79, 70, 229, 0.18);
-  --shadow-glow-strong: 0 0 18px rgba(79, 70, 229, 0.28);
+  --radius-sm: 2px;
+  --shadow-glow: 0 0 0 2px rgba(44, 90, 160, 0.18);
+  --shadow-glow-strong: 0 0 0 3px rgba(44, 90, 160, 0.26);
 }
 
 /* Defensive: even when CSS vars are missing entirely, give nodes a visible default */

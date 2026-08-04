@@ -3,6 +3,7 @@ import { transformSTToLadderIR } from '../../transformer/st-to-ladder'
 import { LadderRungView } from './LadderRungView'
 import { usePlcStore } from '../../store/plc'
 import { useEditorStore } from '../../store/editor'
+import { stripConfigurationBlock } from '../../lang/st-source'
 import { useT } from '../../i18n'
 import './ladder-rungs.css'
 
@@ -15,18 +16,6 @@ import './ladder-rungs.css'
  * ladder IR (transformSTToLadderIR) and draws directly from the rung/
  * inputNetwork/output structure; live coloring comes from the plc store values.
  */
-
-/**
- * OpenPLC runtime expects ST that ends with a CONFIGURATION ... END_CONFIGURATION
- * block declaring the resource + task, but the lifted ladder transformer was
- * written for "pure" ST (just PROGRAM ... END_PROGRAM) and reports syntax errors
- * for the trailing block. Strip it for visualisation only; the compile path
- * (plc-tools) sees the original source.
- */
-function stripConfigurationBlock(src: string): string {
-  const m = src.match(/^([\s\S]*?END_PROGRAM)/i)
-  return m ? m[1] : src
-}
 
 export function LadderCanvas({ stCode }: { stCode: string }) {
   const t = useT()

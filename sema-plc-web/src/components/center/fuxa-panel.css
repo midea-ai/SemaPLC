@@ -5,13 +5,13 @@
 .fuxa-live{color:var(--ok);font-weight:600;}
 .fuxa-widgets{font-family:var(--mono);color:var(--text-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .fuxa-spacer{flex:1;}
-.fuxa-btn{font-size:12px;font-weight:600;color:var(--text-2);border:1px solid var(--line);border-radius:6px;
-  padding:4px 10px;background:#fff;text-decoration:none;}
+.fuxa-btn{font-size:12px;font-weight:600;color:var(--text-2);border:1px solid var(--line);border-radius:var(--r-sm);
+  padding:4px 10px;background:var(--panel);text-decoration:none;}
 .fuxa-btn:hover{border-color:var(--brand);color:var(--brand);}
-.fuxa-frame{flex:1;width:100%;border:none;min-height:0;background:#fff;}
+.fuxa-frame{flex:1;width:100%;border:none;min-height:0;background:var(--panel);}
 
 .fuxa-cta{margin-top:8px;font-size:13px;font-weight:600;color:#fff;background:var(--brand);
-  border:none;border-radius:9px;padding:9px 18px;}
+  border:none;border-radius:var(--r-sm);padding:9px 18px;}
 .fuxa-cta:hover:not(:disabled){filter:brightness(1.07);}
 .fuxa-cta:disabled{opacity:.45;cursor:default;}
 .fuxa-warn{font-size:12px;color:var(--warn);max-width:380px;line-height:1.6;}

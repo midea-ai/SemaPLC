@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { WsClient } from '../ws/client'
+import type { WsClientLike } from '../ws/client'
 
 interface WorkspaceStore {
   path: string | null
@@ -17,7 +17,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set) => ({
   setSwitching: () => set({ switching: true }),
 }))
 
-export function subscribeWorkspaceToWs(client: WsClient) {
+export function subscribeWorkspaceToWs(client: WsClientLike) {
   client.on((m) => {
     switch (m.type) {
       case 'workspace:ready':

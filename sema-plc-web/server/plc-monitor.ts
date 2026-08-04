@@ -1,6 +1,6 @@
 import { bus } from './event-bus.js'
 import { readPlcState, plcStateFileForWorkspace } from './state-reader.js'
-import type { PlcConfig } from '../../sema-plc-tools/dist/config.js'
+import { dockerBin, type PlcConfig } from '../../sema-plc-tools/dist/config.js'
 // Note: we direct-import from the built plc-tools dist
 import { handleReadVariables } from '../../sema-plc-tools/dist/tools/readVariables.js'
 import { handleStatus } from '../../sema-plc-tools/dist/tools/status.js'
@@ -27,8 +27,10 @@ export class PlcMonitor {
   private _handleStatus: typeof handleStatus
   private _handleReadVariables: typeof handleReadVariables
 
-  // Last-seen snapshot for diff
-  private lastStatus: string | null = null
+  // Last-seen snapshot for diff。键带上 reachable:不可达时 status 也是 ERROR,
+  // 只比 status 的话「容器没起」→「容器起来了但编译错」这一跳不会 emit,
+  // 消费端会永久卡在第一次进入 ERROR 时的含义上。
+  private lastStateKey: string | null = null
   private lastValues: Record<string, VariableValue> = {}
 
   // Active client count (start polling when >0)
@@ -52,6 +54,7 @@ export class PlcMonitor {
       password: opts.plcPassword ?? 'admin123',
       stateFile: plcStateFileForWorkspace(opts.workspace),
       poolSize: Number(process.env.PLC_POOL_SIZE) || 1, // 占位:monitor 不消费 poolSize
+      dockerBin: dockerBin(),
     }
     this.client = new RuntimeClient(this.cfg.url, this.cfg.user, this.cfg.password)
   }
@@ -85,7 +88,7 @@ export class PlcMonitor {
     this.muted = muted
     if (!muted) {
       // Reset last-seen so the next tick re-emits the truth even if it matches the pre-mute value
-      this.lastStatus = null
+      this.lastStateKey = null
       this.lastValues = {}
     }
   }
@@ -96,9 +99,11 @@ export class PlcMonitor {
     try {
       const s = await this._handleStatus(this.client)
       status = s.status
-      if (status !== this.lastStatus) {
-        this.lastStatus = status
-        if (!this.muted) bus.emit({ type: 'plc:state', status: status as any })
+      const reachable = s.runtimeReachable !== false
+      const key = `${status}|${reachable}`
+      if (key !== this.lastStateKey) {
+        this.lastStateKey = key
+        if (!this.muted) bus.emit({ type: 'plc:state', status: status as any, reachable })
       }
     } catch {
       // PLC unreachable; skip values
@@ -126,7 +131,7 @@ export class PlcMonitor {
     this.stopPolling()
     this.workspace = newWorkspace
     this.cfg.stateFile = plcStateFileForWorkspace(newWorkspace)
-    this.lastStatus = null
+    this.lastStateKey = null
     this.lastValues = {}
     if (this.activeClients > 0) this.startPolling()
   }

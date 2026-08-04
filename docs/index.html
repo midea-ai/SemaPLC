@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sema PLC Documentation</title>
+  <meta name="description" content="Sema PLC - Agent 驱动的工业 PLC 编程 IDE 文档">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/docsify@4/lib/themes/vue.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/prismjs@1/themes/prism-tomorrow.min.css">
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+</head>
+<body>
+  <div id="app">Loading...</div>
+  <script>
+    var ARROW_SVG = '<svg class="folder-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>';
+
+    window.$docsify = {
+      name: '<img src="images/semaplc.jpg" alt="Sema PLC" class="sidebar-logo">',
+      repo: 'https://github.com/midea-ai/SemaPLC',
+      loadSidebar: true,
+      alias: {
+        '/en/.*/_sidebar.md': '/en/_sidebar.md',
+        '/(?!en/).*/_sidebar.md': '/_sidebar.md'
+      },
+      subMaxLevel: 0,
+      auto2top: true,
+      search: {
+        placeholder: { '/en/': 'Search...', '/': '搜索文档...' },
+        noData: { '/en/': 'No results', '/': '没有找到结果' },
+        paths: 'auto',
+        depth: 6,
+        pathNamespaces: ['/en']
+      },
+      markdown: {
+        renderer: {
+          code(code, lang) {
+            if (lang === 'mermaid') return '<div class="mermaid">' + code + '</div>';
+            return this.origin.code.apply(this, arguments);
+          }
+        }
+      },
+      pagination: { previousText: '上一节', nextText: '下一节', crossChapter: true, crossChapterText: true },
+      count: { language: 'chinese' },
+      plugins: [mainPlugin]
+    };
+
+    function mainPlugin(hook) {
+      var mathBlocks = [];
+
+      // Extract math before marked.js mangles backslashes / underscores
+      hook.beforeEach(function(content) {
+        mathBlocks = [];
+        // Shield code fences and inline code first — a $ inside code (e.g. $PORT)
+        // must never be treated as a math delimiter
+        var codeStore = [];
+        content = content.replace(/```[\s\S]*?```|`[^`\n]+`/g, function(m) {
+          codeStore.push(m);
+          return 'C' + (codeStore.length - 1) + '';
+        });
+        // Block math $$...$$ first
+        content = content.replace(/\$\$([\s\S]*?)\$\$/g, function(match) {
+          var idx = mathBlocks.length;
+          mathBlocks.push({ display: true, latex: match });
+          return '<div class="math-ph" data-idx="' + idx + '"></div>';
+        });
+        // Inline math $...$
+        content = content.replace(/\$([^\$\n]+?)\$/g, function(match) {
+          var idx = mathBlocks.length;
+          mathBlocks.push({ display: false, latex: match });
+          return '<span class="math-ph" data-idx="' + idx + '"></span>';
+        });
+        // Unshield code
+        content = content.replace(/C(\d+)/g, function(_, i) {
+          return codeStore[parseInt(i)];
+        });
+        return content;
+      });
+
+      // Re-inject raw LaTeX after markdown rendering
+      hook.afterEach(function(html) {
+        // marked may wrap a block placeholder in <p>...</p> — unwrap it
+        html = html.replace(/<p>\s*<div class="math-ph" data-idx="(\d+)"><\/div>\s*<\/p>/g,
+          '<div class="math-ph" data-idx="$1"></div>');
+        html = html.replace(/<(div|span) class="math-ph" data-idx="(\d+)"><\/(div|span)>/g,
+          function(_, _tag, i) {
+            var b = mathBlocks[parseInt(i)];
+            return b ? b.latex : _;
+          });
+        // Wrap tables so wide ones scroll horizontally instead of overflowing the content area
+        html = html.replace(/<table>/g, '<div class="table-wrap"><table>')
+                   .replace(/<\/table>/g, '</table></div>');
+        return html;
+      });
+
+      hook.doneEach(function() {
+        initCollapsible();
+        initHomeBtn();
+        buildRightToc();
+        renderMermaid();
+        renderKatex();
+        updateHomeClass();
+        initLangToggle();
+      });
+    }
+
+    // 中英文切换:/xxx ↔ /en/xxx。挂在正文右上角(与 h1 齐平),不是原来那个贴着
+    // GitHub 角标的固定按钮。两段并排:一眼看出有哪两种语言、当前在哪个。
+    function initLangToggle() {
+      var host = document.querySelector('.markdown-section');
+      if (!host) return;
+      var isEn = /^#\/en(\/|$)/.test(location.hash);
+      var box = document.getElementById('lang-toggle');
+      if (!box) {
+        box = document.createElement('div');
+        box.id = 'lang-toggle';
+        box.setAttribute('role', 'group');
+        box.setAttribute('aria-label', 'Language / 语言');
+        box.innerHTML = '<button type="button" data-lang="zh">中文</button>'
+                      + '<button type="button" data-lang="en">EN</button>';
+        box.addEventListener('click', function(e) {
+          var b = e.target.closest('button');
+          if (!b) return;
+          var toEn = b.getAttribute('data-lang') === 'en';
+          var h = (location.hash.replace(/^#/, '') || '/').split('?')[0];
+          if (toEn === /^\/en(\/|$)/.test(h)) return;   // 已经是该语言
+          location.hash = '#' + (toEn ? '/en' + h : (h.replace(/^\/en\/?/, '/') || '/'));
+        });
+      }
+      // 正文每次路由都整块重渲染,所以每轮都要重新挂进去(元素已存在则是移动,不会重复)
+      host.insertAdjacentElement('afterbegin', box);
+      box.querySelectorAll('button').forEach(function(b) {
+        var on = (b.getAttribute('data-lang') === 'en') === isEn;
+        b.classList.toggle('active', on);
+        b.setAttribute('aria-pressed', on ? 'true' : 'false');
+      });
+      // 分页插件的固定文案按语言替换(插件初始化后配置不可变,只能改渲染结果)
+      setTimeout(function() {
+        document.querySelectorAll('.pagination-item-label span').forEach(function(s) {
+          if (isEn && s.textContent === '上一节') s.textContent = 'Previous';
+          if (isEn && s.textContent === '下一节') s.textContent = 'Next';
+          if (!isEn && s.textContent === 'Previous') s.textContent = '上一节';
+          if (!isEn && s.textContent === 'Next') s.textContent = '下一节';
+        });
+      }, 0);
+    }
+
+    // Collapsible sidebar folders
+    function initCollapsible() {
+      var nav = document.querySelector('.sidebar-nav');
+      if (!nav) return;
+
+      var savedState = {};
+      try { savedState = JSON.parse(sessionStorage.getItem('sidebarFolders') || '{}'); } catch(e) {}
+
+      nav.querySelectorAll('li').forEach(function(li) {
+        if (li.classList.contains('has-children') || !Array.from(li.children).some(c => c.tagName === 'UL')) return;
+        li.classList.add('has-children');
+
+        var toggle = Array.from(li.children).find(c => /^(A|STRONG|P|EM)$/.test(c.tagName));
+        if (!toggle) {
+          var textNode = Array.from(li.childNodes).find(n => n.nodeType === 3 && n.nodeValue.trim());
+          if (textNode) {
+            toggle = document.createElement('span');
+            toggle.className = 'folder-label';
+            toggle.textContent = textNode.nodeValue.trim();
+            li.replaceChild(toggle, textNode);
+          }
+        }
+        if (!toggle || toggle.querySelector('.folder-arrow')) return;
+
+        var key = toggle.textContent.trim().substring(0, 30);
+
+        // 非顶层文件夹：恢复保存的状态，默认折叠
+        var parentUl = li.parentElement;
+        var grandParentLi = parentUl ? parentUl.parentElement : null;
+        var isNested = grandParentLi && grandParentLi.tagName === 'LI';
+        if (isNested) {
+          var isCollapsed = key in savedState ? savedState[key] : true;
+          if (isCollapsed) li.classList.add('collapsed');
+        }
+
+        toggle.insertAdjacentHTML('beforeend', ARROW_SVG);
+
+        toggle.addEventListener('click', function(e) {
+          if (toggle.tagName === 'A' && toggle.getAttribute('href') && toggle.getAttribute('href') !== '#') {
+            if (e.clientX < toggle.getBoundingClientRect().right - 30) return;
+          }
+          e.preventDefault();
+          e.stopPropagation();
+          li.classList.toggle('collapsed');
+          if (isNested) {
+            savedState[key] = li.classList.contains('collapsed');
+            try { sessionStorage.setItem('sidebarFolders', JSON.stringify(savedState)); } catch(e) {}
+          }
+        });
+      });
+
+      // Expand ancestors of the active page
+      var hash = window.location.hash.replace(/\?.*$/, '');
+      var activeLink = nav.querySelector('li.active > a') ||
+                       (hash ? nav.querySelector('a[href="' + hash + '"]') : null);
+      if (activeLink) {
+        // Fallback: docsify may miss the active class on direct deep-link loads
+        var activeLi = activeLink.parentElement;
+        if (!activeLi.classList.contains('active')) {
+          activeLi.classList.add('active');
+          activeLink.scrollIntoView({ block: 'nearest' });
+        }
+        var el = activeLink.parentElement;
+        while (el && el !== nav) {
+          if (el.tagName === 'LI' && el.classList.contains('collapsed')) {
+            el.classList.remove('collapsed');
+          }
+          el = el.parentElement;
+        }
+      }
+    }
+
+    // Toggle is-home class on body when current page is the home page
+    function updateHomeClass() {
+      var path = window.location.hash.replace(/\?.*$/, '').replace(/^#/, '');
+      var isHome = path === '' || path === '/';
+      document.body.classList.toggle('is-home', isHome);
+    }
+
+    // Home button
+    function initHomeBtn() {
+      if (document.querySelector('.sidebar-home-btn')) return;
+      var btn = document.createElement('button');
+      btn.className = 'sidebar-home-btn';
+      btn.title = '回到主页';
+      btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>';
+      btn.addEventListener('click', function() { window.location.hash = '#/'; });
+      document.body.appendChild(btn);
+    }
+
+    // Right-side TOC
+    function buildRightToc() {
+      var toc = document.querySelector('.right-toc') || document.createElement('div');
+      toc.className = 'right-toc';
+      if (!toc.parentNode) document.body.appendChild(toc);
+
+      var headings = document.querySelectorAll('.markdown-section h2, .markdown-section h3, .markdown-section h4, .markdown-section h5');
+      if (!headings.length) { toc.innerHTML = ''; toc.style.display = 'none'; return; }
+      toc.style.display = '';
+
+      var page = window.location.hash.replace(/\?.*$/, '').replace(/^#/, '') || '/';
+      var indentMap = { H2: 0, H3: 10, H4: 20, H5: 30 };
+      var html = '<div class="toc-title"><span>目录</span><span class="toc-toggle">‹</span></div><ul>';
+      headings.forEach(function(h) {
+        var href = h.id ? '#' + page + '?id=' + h.id : '#' + page;
+        var px = indentMap[h.tagName] || 0;
+        var indent = px ? ' style="padding-left:' + px + 'px"' : '';
+        html += '<li' + indent + '><a href="' + href + '">' + h.textContent + '</a></li>';
+      });
+      toc.innerHTML = html + '</ul>';
+
+      // Click title to collapse / expand, state persists across pages
+      function setTocCollapsed(c) {
+        toc.classList.toggle('collapsed', c);
+        document.body.classList.toggle('toc-collapsed', c);
+      }
+      setTocCollapsed(localStorage.getItem('rightTocCollapsed') === '1');
+      toc.querySelector('.toc-title').onclick = function() {
+        var c = !toc.classList.contains('collapsed');
+        setTocCollapsed(c);
+        try { localStorage.setItem('rightTocCollapsed', c ? '1' : '0'); } catch(e) {}
+      };
+
+      window.removeEventListener('scroll', window._tocScroll);
+      window._tocScroll = function() {
+        var active = -1;
+        headings.forEach(function(h, i) { if (h.getBoundingClientRect().top <= 80) active = i; });
+        toc.querySelectorAll('li').forEach(function(li, i) { li.classList.toggle('active', i === active); });
+      };
+      window.addEventListener('scroll', window._tocScroll, { passive: true });
+      window._tocScroll();
+    }
+
+    // Mermaid
+    function renderMermaid() {
+      if (typeof mermaid !== 'undefined') {
+        try { mermaid.run({ querySelector: '.mermaid' }); } catch(e) { console.warn('Mermaid render error:', e); }
+      }
+    }
+
+    // KaTeX
+    function renderKatex() {
+      if (typeof renderMathInElement === 'undefined') return;
+      var el = document.querySelector('.markdown-section');
+      if (!el) return;
+      renderMathInElement(el, {
+        delimiters: [
+          { left: '$$', right: '$$', display: true },
+          { left: '$',  right: '$',  display: false }
+        ],
+        throwOnError: false
+      });
+    }
+
+    // Group search results by source document
+    (function() {
+      function getTitle(path) {
+        var a = document.querySelector('.sidebar-nav a[href="#' + path + '"]');
+        if (a) return a.textContent.trim();
+        return (path.replace(/\/$/, '').split('/').pop() || 'Home')
+          .replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+      }
+
+      function groupResults(panel) {
+        var posts = panel.querySelectorAll('.matching-post');
+        if (!posts.length || panel.querySelector('.search-group')) return;
+        var groups = {}, order = [];
+        posts.forEach(function(post) {
+          var link = post.querySelector('a');
+          if (!link) return;
+          var p = (link.getAttribute('href') || '').replace(/^#/, '').replace(/\?.*$/, '') || '/';
+          if (!groups[p]) { groups[p] = []; order.push(p); }
+          groups[p].push(post);
+        });
+        panel.innerHTML = '';
+        order.forEach(function(p) {
+          var g = document.createElement('div');
+          g.className = 'search-group';
+          g.innerHTML = '<div class="search-group-title">' + getTitle(p) + '</div>';
+          groups[p].forEach(function(post) { g.appendChild(post); });
+          panel.appendChild(g);
+        });
+      }
+
+      function startObserving() {
+        var el = document.querySelector('.search');
+        if (!el) return setTimeout(startObserving, 500);
+        new MutationObserver(function() {
+          var panel = document.querySelector('.search .results-panel');
+          if (panel && panel.querySelector('.matching-post') && !panel.querySelector('.search-group')) groupResults(panel);
+        }).observe(el, { childList: true, subtree: true });
+      }
+      setTimeout(startObserving, 1000);
+    })();
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/docsify@4/lib/docsify.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/docsify@4/lib/plugins/search.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/docsify-copy-code@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/docsify-pagination/dist/docsify-pagination.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1/prism.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1/components/prism-typescript.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1/components/prism-bash.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1/components/prism-json.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1/components/prism-python.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+  <script>
+    if (typeof mermaid !== 'undefined') {
+      mermaid.initialize({
+        startOnLoad: false,
+        theme: 'default',
+        themeVariables: {
+          primaryColor: '#e8f4fd', primaryBorderColor: '#3498db', primaryTextColor: '#2c3e50',
+          lineColor: '#3498db', secondaryColor: '#f8f9fa', tertiaryColor: '#fff'
+        },
+        flowchart: { useMaxWidth: true, htmlLabels: true },
+        sequence: { useMaxWidth: true }
+      });
+    }
+  </script>
+</body>
+</html>

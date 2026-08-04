@@ -239,6 +239,11 @@ export function validateSceneSpec(
     }
 
     if (p.kind === 'custom') {
+      // 前端只给库部件画外层 label(画在部件盒下方);custom 是一整幅自绘画面、占满画布,
+      // 外层没有地方摆标注 → 写在 label 上的标题/说明会静默消失(画面上什么都看不到)。
+      if (typeof p.label === 'string' && p.label.trim()) {
+        warnings.push(`${tag}: custom 部件的 label("${p.label}")不会渲染——标题/说明请画进 svg 自己的 <text> 里`)
+      }
       if (typeof p.svg !== 'string' || !p.svg.trim()) {
         errors.push(`${tag}: a custom part requires a non-empty svg string`)
       } else {
