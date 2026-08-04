@@ -22,6 +22,8 @@
 
 **Sema PLC** turns a natural-language control requirement into a running PLC program. Type a task into the chat panel — *"latch a motor when the start button is pressed and a 3-second timer elapses"* — and an embedded [sema-core](https://github.com/midea-ai/sema-code-core) Agent writes IEC 61131-3 Structured Text, compiles it, deploys it to a live [OpenPLC Runtime](https://openplcproject.com/), behavior-verifies it (force inputs, trace variables), and renders the result as a ladder diagram + live variable values + a process simulation.
 
+**[📚 View Documentation](https://midea-ai.github.io/SemaPLC/#/en/)** — architecture, toolchain reference, and Web IDE internals (English / 中文).
+
 The repository ships two products that work together:
 
 | Package | Role |

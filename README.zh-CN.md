@@ -22,6 +22,8 @@
 
 **Sema PLC** 把一句自然语言的控制需求变成一个运行中的 PLC 程序。在聊天面板里输入任务 —— *"按下启动按钮且 3 秒定时器到达后锁存电机"* —— 内置的 [sema-core](https://github.com/midea-ai/sema-code-core) Agent 会编写 IEC 61131-3 结构化文本(ST)、编译它、部署到运行中的 [OpenPLC Runtime](https://openplcproject.com/)、做行为验证(强制输入、采样变量),并把结果以梯形图 + 实时变量 + 过程仿真的形式呈现。
 
+**[📚 查看文档](https://midea-ai.github.io/SemaPLC/#/)** —— 架构设计、工具链参考与 Web IDE 机制(中文 / English)。
+
 仓库包含两个协同工作的产品:
 
 | 包 | 角色 |
