@@ -20,7 +20,7 @@
   },
   "homepage": "https://github.com/midea-ai/SemaPLC/tree/main/sema-plc-vscode#readme",
   "engines": {
-    "vscode": "^1.101.0"
+    "vscode": "^1.106.0"
   },
   "categories": [
     "Programming Languages",
@@ -65,8 +65,34 @@
         "command": "semaplc.check",
         "category": "SemaPLC",
         "title": "Check Current ST File"
+      },
+      {
+        "command": "semaplc.newSession",
+        "category": "SemaPLC",
+        "title": "New Session (resets workspace)",
+        "icon": "$(add)"
+      },
+      {
+        "command": "semaplc.settings",
+        "category": "SemaPLC",
+        "title": "Settings",
+        "icon": "$(gear)"
       }
     ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "semaplc.newSession",
+          "when": "view == semaplc.chat",
+          "group": "navigation@1"
+        },
+        {
+          "command": "semaplc.settings",
+          "when": "view == semaplc.chat",
+          "group": "navigation@2"
+        }
+      ]
+    },
     "snippets": [
       {
         "language": "st",
@@ -110,7 +136,13 @@
         "semaplc.model": {
           "type": "string",
           "default": "deepseek",
-          "description": "默认 LLM 模型(对应 server 的 PLC_MODEL)"
+          "markdownDescription": "默认 LLM 模型(对应 server 的 PLC_MODEL)。**没显式改过**这一项时,`semaplc.envFile` 里的 `PLC_MODEL` 优先。"
+        },
+        "semaplc.envFile": {
+          "type": "string",
+          "default": "",
+          "scope": "machine",
+          "markdownDescription": "一个 `.env` 文件路径,里面的 `*_API_KEY` / `PLC_*` 会注入本地 server(支持 `~/`,相对路径按当前文件夹解析)。\n\n用来复用你已有的配置,例如 `~/SemaPLC/sema-plc-web/.env`,省得把 key 再填一遍。改完需要重载窗口。\n\n优先级:插件里用「设置 LLM API Key」存的 key > 本文件 > 继承的 shell 环境。`PORT` / `WS_PORT` / `SEMAPLC_DATA_DIR` / `PLC_WORKSPACE` 等由扩展控制,写在文件里也会被忽略。\n\n⚠️ 仅用户/机器级设置有效:workspace 设置可改就等于「克隆仓库 = 让你读任意文件并把内容注入子进程环境」。"
         },
         "semaplc.container.bin": {
           "type": "string",
@@ -142,7 +174,7 @@
       }
     },
     "viewsContainers": {
-      "activitybar": [
+      "secondarySidebar": [
         {
           "id": "semaplc",
           "title": "SemaPLC",
@@ -169,7 +201,7 @@
   },
   "devDependencies": {
     "@types/node": "^20.14.0",
-    "@types/vscode": "^1.101.0",
+    "@types/vscode": "^1.106.0",
     "@types/ws": "^8.18.1",
     "esbuild": "^0.24.0",
     "typescript": "^5.6.0"

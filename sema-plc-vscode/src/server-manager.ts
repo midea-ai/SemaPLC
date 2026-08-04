@@ -4,6 +4,8 @@ import * as fs from 'fs'
 import * as path from 'path'
 import { spawn, ChildProcess } from 'child_process'
 import { resolveWorkspace } from './workspace'
+import { resolveBin } from './runtime-guide'
+import { loadEnvFile, resolveEnvPath } from './env-file'
 
 /** 各 LLM provider 的 key 环境变量名(与 sema-plc-web/server/model-registry.ts 的 ENV_HINTS 保持一致)。 */
 export const API_KEY_ENVS = [
@@ -186,8 +188,19 @@ export class ServerManager {
       path.join(this.ctx.extensionPath, 'vendor', 'plc-tools', 'dist'),
       path.join(this.ctx.extensionPath, '..', 'sema-plc-tools', 'dist'),
     )
+    // semaplc.envFile:指一个 .env 过来,把里面的 *_API_KEY / PLC_* 注入 server 进程。
+    // 排在 process.env 之后 = 显式配置压过从 VSCode 进程继承来的 shell 环境;排在下面
+    // 那几行之前 = 扩展自己算出来的端口/工作区永远说了算(parseEnvFile 里还拦了一道)。
+    const envFile = cfg.get<string>('envFile')?.trim()
+    const fromFile = envFile
+      ? loadEnvFile(
+          resolveEnvPath(envFile, vscode.workspace.workspaceFolders?.[0]?.uri.fsPath),
+          (m) => this.out.appendLine(m),
+        )
+      : {}
     const env: NodeJS.ProcessEnv = {
       ...process.env,
+      ...fromFile,
       PORT: String(httpPort),
       WS_PORT: String(wsPort),
       SEMAPLC_DATA_DIR: this.ctx.globalStorageUri.fsPath,
@@ -195,11 +208,21 @@ export class ServerManager {
       PLC_URL: cfg.get<string>('plcUrl') || 'https://localhost:8443',
     }
     if (plcToolsDist) env.PLC_TOOLS_DIST = plcToolsDist
-    const model = cfg.get<string>('model')
-    if (model) env.PLC_MODEL = model
+    // semaplc.model 的默认值是 'deepseek',cfg.get 分不出「用户选了 deepseek」和「没动过」。
+    // 不用 inspect 区分的话,.env 里写着 PLC_MODEL=bigmodel 也会被这个默认值顶掉 ——
+    // 用户配好了 key 却发现跑的还是那个没配的模型。只有显式设过才覆盖 .env。
+    const mi = cfg.inspect<string>('model')
+    const explicitModel = mi?.workspaceFolderValue ?? mi?.workspaceValue ?? mi?.globalValue
+    if (explicitModel) env.PLC_MODEL = explicitModel
+    else if (!env.PLC_MODEL) env.PLC_MODEL = cfg.get<string>('model') || 'deepseek'
     const dockerBin = cfg.get<string>('container.bin')
     if (dockerBin) env.PLC_DOCKER_BIN = dockerBin
-    // SecretStorage 里已存的 key(workspace .env 由 server 侧自己读,优先级不变)
+    // 无引擎时把编译/运行类工具从 agent 的 MCP 工具表里摘掉(plc-tools 侧 OFFLINE_TOOLS)。
+    // 不摘的话 agent 会照常调 plc_compile,把 "docker not found" 当成自己代码写错去改 ST。
+    // 只探测不引导:激活路径不该弹模态框,更不该 start/build 容器。
+    env.PLC_ENGINE = (await resolveBin(this.out)) ?? 'none'
+    // SecretStorage 里已存的 key。放在最后 = 压过 envFile:两处都配过时,以用户在插件里
+    // 显式填的那个为准。(server 侧**不**读任何 .env —— 它没有 dotenv,别指望那条路。)
     for (const name of API_KEY_ENVS) {
       const v = await this.ctx.secrets.get(name)
       if (v) env[name] = v

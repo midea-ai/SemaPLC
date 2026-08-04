@@ -33,9 +33,9 @@ export function containerName(): string {
 }
 
 /** execFile 探针:成功返回 stdout,失败返回 null(命令不存在/退出码非 0 都算失败)。 */
-function probe(bin: string, args: string[]): Promise<string | null> {
+function probe(bin: string, args: string[], timeout = 20_000): Promise<string | null> {
   return new Promise((resolve) => {
-    execFile(bin, args, { timeout: 20_000 }, (err, stdout) => resolve(err ? null : stdout))
+    execFile(bin, args, { timeout }, (err, stdout) => resolve(err ? null : stdout))
   })
 }
 
@@ -50,7 +50,9 @@ export async function resolveBin(out: vscode.OutputChannel): Promise<string | nu
       out.appendLine(`[runtime] 忽略非法的 semaplc.container.bin '${bin}'`)
       continue
     }
-    if (await probe(bin, ['info'])) {
+    // 5s 而不是默认 20s:这条探测挂在 server 启动路径上(buildEnv 要拿它决定 PLC_ENGINE),
+    // 装了 docker 但 daemon 没起时 `docker info` 会一直卡到超时,20s 就是侧边栏首开白屏 20s。
+    if (await probe(bin, ['info'], 5_000)) {
       out.appendLine(`[runtime] 容器引擎:${bin}`)
       cachedBin = bin
       return bin
@@ -59,6 +61,20 @@ export async function resolveBin(out: vscode.OutputChannel): Promise<string | nu
   }
   cachedBin = null
   return null
+}
+
+/**
+ * 已探测到的引擎名,**不触发探测**。给同步上下文用(mcp-provider 的 provideMcpServerDefinitions
+ * 不能 await)。undefined = 还没探过,此时不该下"无引擎"的结论。
+ */
+export function knownEngine(): string | null | undefined {
+  return cachedBin
+}
+
+/** 丢掉探测缓存 —— 用户装好 / 启动了 Docker 之后点「重试」走这条。 */
+export function resetEngineCache(): void {
+  cachedBin = undefined
+  buildDeclined = false
 }
 
 /** 跑一条容器命令,stdout/stderr 逐行进 OutputChannel(build 要几分钟,必须有实时日志)。 */
@@ -188,7 +204,7 @@ export function registerRuntimeCommands(ctx: vscode.ExtensionContext, out: vscod
   ctx.subscriptions.push(
     // 改了 bin 设置就丢掉探测缓存,否则要重启 VSCode 才认新值。
     vscode.workspace.onDidChangeConfiguration((e) => {
-      if (e.affectsConfiguration('semaplc.container.bin')) cachedBin = undefined
+      if (e.affectsConfiguration('semaplc.container.bin')) resetEngineCache()
     }),
 
     vscode.commands.registerCommand('semaplc.runtime.start', async () => {

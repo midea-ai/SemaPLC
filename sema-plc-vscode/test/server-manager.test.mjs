@@ -144,3 +144,59 @@ test('启动超时:进程必须被收掉,不留 detached 孤儿', { timeout: 40_
     delete process.env.FAKE_MODE
   }
 })
+
+// ── semaplc.envFile ────────────────────────────────────────────────────────────
+// 直接调 buildEnv:起真进程只能验证"活着",验证不了注入了什么。private 只是 TS 层面的。
+const stub = createRequire(import.meta.url)('./stub-vscode.js')
+
+function envOf(t, { config = {}, secrets = {} } = {}) {
+  const saved = { ...stub.__state.config }
+  Object.assign(stub.__state.config, config)
+  t.after(() => { stub.__state.config = saved })
+  const ctx = {
+    extensionPath: path.join(tmp, 'ext'),
+    globalStorageUri: { fsPath: path.join(tmp, 'globalStorage') },
+    secrets: { get: async (k) => secrets[k] },
+    subscriptions: [],
+  }
+  const out = { appendLine: () => {}, append: () => {}, show: () => {} }
+  const status = { text: '', tooltip: '', backgroundColor: undefined, show: () => {}, dispose: () => {} }
+  return new ServerManager(ctx, out, status).buildEnv(41111, 41112)
+}
+
+test('envFile:key 注入,扩展自控的端口不被 .env 顶掉', async (t) => {
+  const f = path.join(tmp, 'inject.env')
+  fs.writeFileSync(f, 'BIGMODEL_API_KEY=bm-1\nPORT=3001\nWS_PORT=3002\n')
+  const env = await envOf(t, { config: { envFile: f } })
+  assert.equal(env.BIGMODEL_API_KEY, 'bm-1')
+  assert.equal(env.PORT, '41111', 'PORT 必须是 freePorts 挑的那个')
+  assert.equal(env.WS_PORT, '41112')
+})
+
+test('envFile 的 PLC_MODEL 在用户没显式设 semaplc.model 时生效', async (t) => {
+  const f = path.join(tmp, 'model.env')
+  fs.writeFileSync(f, 'PLC_MODEL=bigmodel\n')
+  const env = await envOf(t, { config: { envFile: f } })
+  // 回归:semaplc.model 默认值 'deepseek' 曾无条件覆盖这里 —— 用户配好 .env 却发现
+  // 跑的还是那个没配 key 的 deepseek。
+  assert.equal(env.PLC_MODEL, 'bigmodel')
+})
+
+test('显式设过 semaplc.model 时,它压过 .env', async (t) => {
+  const f = path.join(tmp, 'model2.env')
+  fs.writeFileSync(f, 'PLC_MODEL=bigmodel\n')
+  const env = await envOf(t, { config: { envFile: f, model: 'qwen' } })
+  assert.equal(env.PLC_MODEL, 'qwen')
+})
+
+test('两边都配时 SecretStorage 压过 .env', async (t) => {
+  const f = path.join(tmp, 'both.env')
+  fs.writeFileSync(f, 'DEEPSEEK_API_KEY=from-file\n')
+  const env = await envOf(t, { config: { envFile: f }, secrets: { DEEPSEEK_API_KEY: 'from-secrets' } })
+  assert.equal(env.DEEPSEEK_API_KEY, 'from-secrets')
+})
+
+test('没配 envFile 时不读任何文件,PLC_MODEL 回落到默认', async (t) => {
+  const env = await envOf(t)
+  assert.equal(env.PLC_MODEL, 'deepseek')
+})

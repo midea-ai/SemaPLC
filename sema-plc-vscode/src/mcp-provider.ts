@@ -2,6 +2,7 @@ import * as vscode from 'vscode'
 import * as fs from 'fs'
 import * as path from 'path'
 import { resolveWorkspace, workspaceEnv } from './workspace'
+import { knownEngine } from './runtime-guide'
 
 /**
  * MCP 注册(方案 §4.8):把 plc-tools 以 stdio MCP server 暴露给 Copilot agent mode
@@ -43,6 +44,10 @@ export function registerMcpProvider(
         put('PLC_URL', cfg.get<string>('plcUrl'))
         put('PLC_CONTAINER', cfg.get<string>('container.name'))
         put('PLC_DOCKER_BIN', cfg.get<string>('container.bin'))
+        // 同 server-manager:无引擎时 Copilot 那侧也只该看到纯本地工具。这里不能 await
+        // (provide 是同步的),所以只用已探到的结果 —— undefined(还没探过)时什么都不注入,
+        // 宁可多给几个工具,也不能凭没探测过就断言"无引擎"把工具表清空。
+        if (knownEngine() === null) env.PLC_ENGINE = 'none'
         // 不传这些,plc-tools 会回落到全局默认 ~/.plc-tools/state.json,与面板用的
         // $WORKSPACE/.plc-vis/state.json 是两份:Copilot 编译完面板看不到变量表,
         // 反之 plc_readVariables 报 "No variable map found" 而用户明明刚编译过。

@@ -422,4 +422,30 @@ describe('SemaBridge', () => {
     bus.removeAllListeners()
     await bridge.dispose()
   })
+
+  // 回归:没有任何 *_API_KEY 时,resolveModel 返回 null ⇒ applyModel 从未执行 ⇒ sema-core
+  // 里零个模型。但 createSession 照常成功,于是 user:input 一路走到 processUserInput,
+  // turn 开了却永远不会结束 —— UI 永久卡在「处理中…」。实测复现:agent:turn-start 之后
+  // 再无任何事件。唯一的解释(resolveModel 的 log)在 WS 连上之前就发完了,且不是 sticky,
+  // 客户端永远收不到。所以必须在这里挡住,并且给出一条能到达 UI 的 error。
+  it('无可用模型时 user:input 被挡下:不开 turn,给一条 error(否则 UI 永久转圈)', async () => {
+    const { SemaBridge } = await import('../../server/sema-bridge.js')
+    const { bus } = await import('../../server/event-bus.js')
+    const bridge = new SemaBridge(TMP_WS)
+    await bridge.start()   // 无 *_API_KEY ⇒ active === null
+
+    const events: any[] = []
+    bus.on((m) => events.push(m))
+    bus.emit({ type: 'internal:user-input', text: '写一个红绿灯' })
+    await new Promise((r) => setTimeout(r, 10))
+
+    const types = events.map((e) => e.type)
+    expect(types).not.toContain('agent:turn-start')
+    const err = events.find((e) => e.type === 'error')
+    expect(err).toBeDefined()
+    expect(err.message).toMatch(/API Key|未配置/)
+
+    bus.removeAllListeners()
+    await bridge.dispose()
+  })
 })

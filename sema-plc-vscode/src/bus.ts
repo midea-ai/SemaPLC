@@ -5,6 +5,12 @@ import { STICKY_TYPES, type ClientMessage, type ServerMessage } from '../../sema
 export type WsStatus = 'connecting' | 'open' | 'closed' | 'error'
 
 /**
+ * 容器引擎状态。'unknown' = 还没探测,此时**不渲染**任何提示 —— 首开那两秒闪一条
+ * "运行时不可用" 再收回去,比不提示更糟。
+ */
+export type EngineStatus = 'unknown' | 'ready' | 'none'
+
+/**
  * 扩展是唯一的 WS 客户端(方案 §4.1):server ──ws──> 扩展 ──postMessage──> 各 webview。
  *
  * 为什么不让 webview 自己连:扩展侧本来就必须消费 plc:* 来驱动状态栏和变量树(第 3 步),
@@ -19,6 +25,9 @@ export class Bus {
   private ws: WebSocket | undefined
   private url: string | undefined
   private status: WsStatus = 'closed'
+  private engine: EngineStatus = 'unknown'
+  /** 状态条上「重试」的回调(重新探测 + 重启 server)。由 extension.ts 装上。 */
+  private onEngineRetry: (() => void) | undefined
   /** 每个 view 一份 webview 句柄 + 它的消息订阅;ready 之前不推任何东西。 */
   private views = new Map<string, { webview: vscode.Webview; ready: boolean; sub: vscode.Disposable }>()
   private sticky = new Map<ServerMessage['type'], ServerMessage>()
@@ -126,10 +135,27 @@ export class Bus {
       // 可见时页面从头加载,而 VSCode 不在 API 层缓冲 postMessage —— 在事件那一刻推,
       // webview 的 JS 还没注册监听,消息直接丢,表现为切回来一片空白。
       void entry.webview.postMessage({ type: 'ws:status', status: this.status })
+      void entry.webview.postMessage({ type: 'engine:status', status: this.engine })
       for (const sm of this.sticky.values()) void entry.webview.postMessage({ type: 'ws:message', payload: sm })
       return
     }
     if (m.type === 'ws:send') this.send(m.payload as ClientMessage)
+    if (m.type === 'engine:retry') this.onEngineRetry?.()
+    // 状态条的「去配置」。侧边栏没有 web 版顶栏的 ModelPanel,这是填 key 的唯一入口。
+    if (m.type === 'model:configure') void vscode.commands.executeCommand('semaplc.setApiKey')
+  }
+
+  /** 探测结果 → 状态条。与 setStatus 同构:只推给已 ready 的 view,新 view 靠 ready 重放。 */
+  setEngine(s: EngineStatus): void {
+    if (this.engine === s) return
+    this.engine = s
+    for (const { webview, ready } of this.views.values()) {
+      if (ready) void webview.postMessage({ type: 'engine:status', status: s })
+    }
+  }
+
+  onRetryEngine(cb: () => void): void {
+    this.onEngineRetry = cb
   }
 
   /** webview → server。WS 没就绪时丢弃,与 web 侧 WsClient.send 的行为一致。 */

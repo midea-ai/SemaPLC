@@ -81,3 +81,12 @@
   background: var(--bg);
   color: var(--text-1);
 }
+
+/* 整体缩一档:设计稿是按 web 版 ~555px 的左栏画的,搬进 ~300px 的侧边栏后偏大。
+   用 zoom 而不是改字号 —— semaplc.css 里有 109 处硬编码 px(9px~30px),逐个改是
+   一张永远对不齐的账;zoom 把字号、间距、内边距、边框一起等比缩,比例关系不变。
+   也不用 transform:scale —— 那个不参与布局,会留下一圈空白并撑出滚动条。
+   嫌大/嫌小改这一个数就行。 */
+:root:root[data-theme='vscode'] body {
+  zoom: 0.9;
+}

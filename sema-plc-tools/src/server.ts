@@ -280,8 +280,26 @@ const TOOLS = [
 // lite 收面(spec §4):验证类工具从 MCP 物理移除,验证只能经 verify runner——
 // 弱模型 assert 失败后滑回 force→read 老路的通道被结构性堵死(评审 P0-1)。
 export const LITE_TOOLS = new Set(['plc_status', 'plc_readVariables', 'plc_getLogs', 'plc_detectIO', 'plc_buildSimulation', 'plc_stop'])
-export function filterToolsForLite(lite: boolean) { return lite ? TOOLS.filter(t => LITE_TOOLS.has(t.name)) : TOOLS }
-export function isToolAllowed(name: string, lite: boolean) { return !lite || LITE_TOOLS.has(name) }
+
+// engineless 收面:没有容器引擎(也没有可达的远程 OpenPLC)时仍然成立的工具 ——
+// 纯本地解析/生成,既不 docker exec 也不打 REST。其余一律物理移除。
+//
+// 为什么是移除而不是让它失败:工具还在列表里,agent 就会照常调 plc_compile,拿回一坨
+// "docker: command not found",然后把基础设施故障当成自己代码写错 —— 开始猜测性改码、
+// 反复重试,烧 token 还把好代码改坏。工具不在列表里,它自然只做写码和讲解。
+export const OFFLINE_TOOLS = new Set(['plc_detectIO', 'plc_buildSimulation'])
+
+/** PLC_ENGINE=none 由扩展在探测不到 docker/podman 时注入(见 sema-plc-vscode/src/server-manager.ts)。 */
+export function isEngineless(): boolean { return process.env.PLC_ENGINE === 'none' }
+
+export function filterToolsForLite(lite: boolean, engineless = false) {
+  const base = lite ? TOOLS.filter(t => LITE_TOOLS.has(t.name)) : TOOLS
+  return engineless ? base.filter(t => OFFLINE_TOOLS.has(t.name)) : base
+}
+export function isToolAllowed(name: string, lite: boolean, engineless = false) {
+  if (engineless && !OFFLINE_TOOLS.has(name)) return false
+  return !lite || LITE_TOOLS.has(name)
+}
 
 // When a multi-file project was combined, rewrite iec2c error lines (which point
 // at the merged unit) back to their source file + local line, additively.
@@ -297,17 +315,29 @@ function applyErrorTraceback(cr: { iec2c?: { errors?: Iec2cError[]; warnings?: I
 
 export async function startMcpServer(opts: { lite?: boolean } = {}): Promise<void> {
   const cfg = loadConfig()
+  // 进程生命周期内固定:env 由扩展在 spawn 时给定,用户装好 docker 后是重启 server 生效。
+  const engineless = isEngineless()
   const client = new RuntimeClient(cfg.url, cfg.user, cfg.password)
   const server = new Server(
     { name: 'plc-tools', version: '0.1.0' },
     { capabilities: { tools: {} } },
   )
 
-  server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: filterToolsForLite(!!opts.lite) }))
+  server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: filterToolsForLite(!!opts.lite, engineless) }))
 
   server.setRequestHandler(CallToolRequestSchema, async (req) => {
     const { name, arguments: args } = req.params
     const input = (args ?? {}) as Record<string, unknown>
+
+    // 兜底(工具已不在 list 里,理论上调不到;历史对话里的旧工具名会走到这)。文案是写给
+    // 模型看的:必须明说「不是代码问题、重试无用」,否则它会把这当编译失败去改 ST。
+    if (engineless && !OFFLINE_TOOLS.has(name)) {
+      return { content: [{ type: 'text', text: JSON.stringify({ success: false,
+        errorMessage: `${name} 在本机不可用:未检测到容器引擎(Docker / Podman),PLC 的编译、运行与验证已整体停用。` +
+          `这不是 ST 代码的问题 —— 重试、改代码、换参数都不会让它可用。请直接告诉用户:` +
+          `安装并启动 Docker Desktop / Podman,或把设置 semaplc.plcUrl 指向一台远程 OpenPLC。` +
+          `在此之前你仍然可以写码、讲解、画梯形图,以及使用 plc_detectIO / plc_buildSimulation。` }) }] }
+    }
 
     if (!isToolAllowed(name, !!opts.lite)) {
       return { content: [{ type: 'text', text: JSON.stringify({ success: false,

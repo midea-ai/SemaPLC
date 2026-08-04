@@ -42,7 +42,18 @@ module.exports = {
   },
   workspace: {
     // 默认 state.config 为空 ⇒ get 返回 undefined ⇒ 走产品代码里的默认值分支
-    getConfiguration: () => ({ get: (key) => state.config[key] }),
+    getConfiguration: () => ({
+      get: (key) => state.config[key],
+      // 真实 inspect 用来区分「用户显式设过」和「只是默认值」。stub 里 state.config
+      // 放什么就算显式设过(globalValue),没放的键 inspect 返回全 undefined ——
+      // 与 VSCode 对一个只有 default 的配置项的行为一致。
+      inspect: (key) => ({
+        key,
+        globalValue: state.config[key],
+        workspaceValue: undefined,
+        workspaceFolderValue: undefined,
+      }),
+    }),
     onDidChangeConfiguration: () => noopDisposable,
     onDidChangeWorkspaceFolders: () => noopDisposable,
     onDidSaveTextDocument: (handler) => rec('onDidSave', { handler }),
