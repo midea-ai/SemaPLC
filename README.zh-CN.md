@@ -24,6 +24,10 @@
 
 **[📚 查看文档](https://midea-ai.github.io/SemaPLC/#/)** —— 架构设计、工具链参考与 Web IDE 机制(中文 / English)。
 
+<p align="center">
+  <img src="docs/images/demo.gif" alt="Sema PLC 演示 —— 自然语言变成运行中的 PLC 程序" width="820" />
+</p>
+
 仓库包含两个协同工作的产品:
 
 | 包 | 角色 |

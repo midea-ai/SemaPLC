@@ -24,6 +24,10 @@
 
 **[📚 View Documentation](https://midea-ai.github.io/SemaPLC/#/en/)** — architecture, toolchain reference, and Web IDE internals (English / 中文).
 
+<p align="center">
+  <img src="docs/images/demo.gif" alt="Sema PLC demo — natural language to a running PLC program" width="820" />
+</p>
+
 The repository ships two products that work together:
 
 | Package | Role |
