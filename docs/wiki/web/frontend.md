@@ -24,7 +24,7 @@
 
 ### ST 语言支持(`src/lang/`)
 
-基于 Lezer 的 ST 语法(`st.grammar`),提供 CodeMirror 的语法高亮与自动补全;`st-hover` / `st-docs` 提供文档数据(悬停提示尚未挂载进编辑器,补全 info 面板已生效)。
+基于 Lezer 的 ST 语法(`st.grammar`),提供 CodeMirror 的语法高亮与自动补全;`st-docs` 提供文档数据,经补全 info 面板呈现(早期的 `st-hover` 悬停提示模块已在语言服务重构中删除)。
 
 ### 聊天面板(`src/components/left/`)
 
@@ -36,7 +36,7 @@
 
 ### 状态管理(`src/store/`)
 
-zustand,按域拆分:`agent` / `editor` / `logs` / `model` / `plc` / `sim` / `workspace`。WS 客户端在 `src/ws/client.ts`,启动时连接并把消息分发进各 store。
+zustand,按域拆分:`agent` / `editor` / `engine` / `logs` / `model` / `plc` / `sim` / `workspace`(`engine` 存容器引擎可用性,不经 WS 分发,浏览器版停留 `unknown`)。WS 客户端在 `src/ws/client.ts`,启动时连接并把消息分发进各 store。
 
 ## 目录速览
 
@@ -49,10 +49,14 @@ src/
 │   ├── center/   CodeView / CodeEditor / LadderCanvas / LadderRungView
 │   ├── right/    VariableMonitor
 │   └── sim/      SimRuntime / parts / partsCatalog / layout / resolveEffect
+├── entries/      chat.tsx(VSCode 侧边栏入口,vite 第二构建入口)
 ├── ladder-nodes/ 梯形图 React Flow 自定义节点
 ├── transformer/  ST → 梯形图管线
 ├── lang/         Lezer ST 语法 + CodeMirror 集成
+├── models/       PLC 与梯形图数据类型定义
 ├── store/        zustand stores
+├── lib/          工具函数(codeHighlight 等)
 ├── i18n/         多语言与场景文案
+├── styles/       样式
 └── ws/           WebSocket 客户端
 ```

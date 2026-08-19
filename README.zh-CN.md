@@ -88,7 +88,7 @@ node dist/cli.js serve                                 # 改以 MCP stdio 服务
 
 - **Node.js ≥ 18** 和 **npm**
 - **Docker**(macOS / Windows 上用 Docker Desktop)—— 用于 OpenPLC Runtime 容器
-- 一个 **LLM API key**(推荐 DeepSeek;也支持 MiniMax / Anthropic / Gemini / OpenAI / xAI / Groq / OpenRouter / Qwen / Kimi 等 OpenAI-compatible 提供商)
+- 一个 **LLM API key**(推荐 DeepSeek;也支持 Anthropic 以及 MiniMax / Gemini / OpenAI / xAI / Groq / OpenRouter / Qwen / Kimi 等 OpenAI-compatible 提供商)
 
 ### 安装
 

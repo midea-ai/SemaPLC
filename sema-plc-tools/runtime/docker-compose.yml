@@ -1,12 +1,13 @@
 # OpenPLC Runtime + matiec + xml2st 一体化开发环境
 #
 # 使用：
-#   docker compose up --build -d   # 构建并启动（BuildKit 自动检测宿主架构）
+#   ./scripts/build-matiec-base.sh # 首次先自建基础镜像 openplc-runtime-matiec:main
+#   docker compose up --build -d   # 构建并启动
 #   docker compose logs -f         # 查看启动日志
 #   docker compose down            # 停止并清理
 #
-# 构建时 Docker BuildKit 会自动注入 TARGETARCH（amd64 / arm64），
-# Dockerfile 据此拉取对应架构的 matiec / xml2st 二进制。
+# 镜像强制 linux/amd64（matiec 上游 arm64 release 打包错误，
+# 详见 Dockerfile.plc-dev 头部说明）；Apple Silicon 走 Rosetta 2 仿真。
 
 # 钉死 compose project 名,使其不随目录名变化(产品维度重构前在 W1-D1-D2/,
 # 默认 project 名曾是 w1-d1-d2;固定后 up/down 行为稳定,不再因目录改名而孤立容器)。

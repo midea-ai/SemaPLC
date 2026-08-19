@@ -48,7 +48,7 @@ flowchart LR
 - **头部**:Agent 徽标 + 状态徽章(`processing` → 处理中;否则按 WS status 显示 就绪/连接中/离线)+ `PlanIndicator` + 收起按钮(面板由 App.tsx 的 `react-resizable-panels` 承载,可整体折叠);
 - **空态**:从 `i18n/scenarios` 随机抽 3 个示例场景 chip(crypto RNG 洗牌;「换一批」抽到与当前完全相同的一组时重抽一次),点击即发送预置 prompt;
 - **消息流**:每条 `ChatMessage` 一个 `Bubble`。agent turn 内按 blocks 顺序渲染,先经 `groupBlocks()` 折叠(见下);`status === 'error'` 时显示重试按钮(重发最后一条用户输入),`interrupted` 显示中断提示;自动滚动仅在用户位于底部 40px 内时吸底(`pinnedRef`),收起状态跳过 scrollHeight 读取避免隐藏元素 reflow;
-- **输入区**:thinking 开关(发 `model:set-thinking`)、textarea(Enter 发送、Shift+Enter 换行、IME 组合输入经 `shouldSubmitOnEnter` 防误发)、发送按钮在 `processing` 时变为停止按钮(发 `agent:interrupt`)。
+- **输入区**:thinking 开关(发 `model:set-thinking`)、textarea(Enter 发送、Shift+Enter 换行、IME 组合输入经 `shouldSubmitOnEnter` 防误发)、发送按钮在 `processing` 时变为停止按钮(发 `agent:interrupt`)、上下文用量环(usageRing,按 `agent:usage` 渲染);无可用模型或无容器引擎时输入区上方显示常驻 StatusBar 降级提示,WS 断连或无模型时另经 `inputDisabled` 挡住无效输入(无引擎不挡——仍可写码)。
 
 三类块的渲染组件(`components/left/blocks/`):
 
@@ -77,7 +77,7 @@ export function pickRenderer(toolName: string): ToolRenderer | null {
 }
 ```
 
-`shortName()`(`ToolCallCard.tsx`)剥掉 MCP 前缀 `mcp__<server>__`,所以注册键就是裸工具名。各卡片文件在模块底部自行 `registerRenderer`,`ToolBlock` 只做三件事:隐藏 todo 工具 → `pickRenderer` 命中则用专用卡片 → 否则回落通用 `ToolCallCard`(参数/流式输出/结果三个可展开 JSON 区块,30 行截断)。
+`shortName()`(`ToolCallCard.tsx`)剥掉 MCP 前缀 `mcp__<server>__`,所以注册键就是裸工具名。全部 `registerRenderer` 调用集中在 `registry.tsx` 内(import 各卡片后就地注册),`ToolBlock` 只做三件事:隐藏 todo 工具 → `pickRenderer` 命中则用专用卡片 → 否则回落通用 `ToolCallCard`(参数/流式输出/结果三个可展开 JSON 区块,30 行截断)。
 
 后端 `block-mapper.ts` 对显示链路做三道截断(result/stream 16KB、input 8KB,只影响显示、不影响 Agent 拿到的真实结果);前端 `tools/parse.ts` 的 `parseResult()` 统一处理:先看 `truncated` 标志,再尝试 JSON.parse,失败回落原文。各卡片以此优雅降级——解析失败时仍显示 `ToolShell` 外壳 + 原始文本。
 

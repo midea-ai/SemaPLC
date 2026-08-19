@@ -43,8 +43,11 @@ export interface PlcState {
 | `PLC_WORKSPACE` | 无 | 解析相对 `stPath` 的工作区根;也决定 verify 门的 `.plc-act/latest.json` 位置 |
 | `PLC_MODBUS_PORT` | 无(`null` = 关闭) | 设置后 `plc_compile` 向 ZIP 注入 `modbus_slave.json`,OpenPLC 在此端口开 Modbus TCP 从站(对接 FUXA) |
 | `PLC_POOL_SIZE` | `1`(串行) | verify 工况并行池大小,钳制到 `[1, 16]`;>1 时工况扇出到多实例 |
+| `PLC_DOCKER_BIN` | `docker` | 容器引擎可执行文件替代(podman / colima 等) |
 
-**容器名注入防御**:`PLC_CONTAINER` 在配置入口就按 Docker 自身的合法字符集 `^[a-zA-Z0-9][a-zA-Z0-9_.-]*$` 校验,不合法直接抛错——该值下游会作为 `docker exec` 参数,单点清洗使所有 `execFile/spawn` 免受命令注入。
+此外 `server.ts` 直接读取一个不经 `loadConfig()` 的变量:`PLC_ENGINE`(`none` 时进入 engineless 收面,见下文)。
+
+**容器名注入防御**:`PLC_CONTAINER` 在配置入口就按 Docker 自身的合法字符集 `^[a-zA-Z0-9][a-zA-Z0-9_.-]*$` 校验,不合法直接抛错——该值下游会作为 `docker exec` 参数,单点清洗使所有 `execFile/spawn` 免受命令注入。`PLC_DOCKER_BIN` 同理:进入 `execFile` 前先过白名单 `^[A-Za-z0-9._/-]+$`,拒绝其余字符。
 
 ## MCP 时间预算(mcpBudget.ts)
 
@@ -86,6 +89,8 @@ export const LITE_TOOLS = new Set(['plc_status', 'plc_readVariables', 'plc_getLo
 ```
 
 lite 模式做的是**物理移除**而非提示劝阻:`filterToolsForLite` 让 `ListTools` 只返回名单内 6 个工具,`isToolAllowed` 在 `CallTool` 再拦一道(即使模型凭记忆硬调也会收到结构化拒绝,提示改走 verify runner)。设计意图(源码注释引 spec §4 / 评审 P0-1):把 `plc_forceVariables` / `plc_verifyBehavior` / `plc_trace` 等验证类工具从 MCP 面上拿掉后,**验证只能经声明式 verify runner** 进行——弱模型在断言失败后滑回「force 输入 → read 输出」的不可靠老路的通道被结构性堵死。留下的 6 个都是读侧/低风险或必经工具:状态与变量快照、日志、IO 检测、出仿真图、停机。编译与运行在 lite 环境同样经 runner(CodeAct 路径)完成,见 [声明式验证 Runner](wiki/tools/verify-runner)。
+
+**engineless 收面**:与 `--lite` 并列的第三种收面,且可叠加在 lite 之上。`PLC_ENGINE=none`(由宿主在探测不到 docker/podman 且无可达远程 OpenPLC 时注入)时,`isEngineless()` 生效,工具面收窄为 `OFFLINE_TOOLS = {plc_detectIO, plc_buildSimulation}` 两个纯本地工具——既不 `docker exec` 也不打 REST。同样是物理移除而非报错劝阻:工具若还在列表里,agent 会把 "docker: command not found" 当成代码问题去猜测性改码;移除后它自然只做写码和讲解。`CallTool` 兜底拒绝的文案也明说「不是 ST 代码的问题,重试无用」。
 
 ```mermaid
 flowchart LR

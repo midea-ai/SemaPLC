@@ -71,10 +71,10 @@ ZIP 里还塞了两类"非编译产物":占位的 `c_blocks_code.cpp` / `c_block
 `parseIec2cErrors`(`src/compiler.ts`)用一条正则同时接受 matiec 的两种诊断格式(`file:行-列..行-列:` 与旧式 `file:行:列-行:列:`):
 
 ```ts
-const pattern = /^\S+:(\d+)[-:](\d+)(?:\.\.|-)\d+[-:]\d+:\s+(error|warning):\s+(.+)$/gm
+const pattern = /^\S+:(\d+)[-:](\d+)(?:\.\.|-)(\d+)[-:](\d+):\s+(error|warning):\s+(.+)$/gm
 ```
 
-每条错误带上 `line` / `col` / `severity` / `message`,并从传入的 ST 源码按行号取出 `sourceLine`——agent 修错时不必自己再对行号。随后 `adviceForIec2cError`(`src/tools/iec2cErrorParser.ts`)按模式表匹配 message,命中则附加 `advice`。模式表来自 325 个 benchmark 会话的实证统计,头部两类:
+每条错误带上 `line` / `col` / `endLine` / `endCol`(闭区间末端,供诊断波浪线盖住整个 token)/ `severity` / `message`,并从传入的 ST 源码按行号取出 `sourceLine`——agent 修错时不必自己再对行号。随后 `adviceForIec2cError`(`src/tools/iec2cErrorParser.ts`)按模式表匹配 message,命中则附加 `advice`。模式表来自 325 个 benchmark 会话的实证统计,头部两类:
 
 | matiec 报错 | advice 要点 |
 |---|---|

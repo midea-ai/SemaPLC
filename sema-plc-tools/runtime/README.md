@@ -1,6 +1,6 @@
-# W1 D1-D2: OpenPLC Runtime Development Environment
+# OpenPLC Runtime Development Environment
 
-本目录包含了 PLC Agent 开发方案第一周 D1-D2 的完整交付物，实现了 OpenPLC Runtime v4 + matiec + xml2st 的 Docker 化集成环境。
+本目录实现了 OpenPLC Runtime v4 + matiec + xml2st 的 Docker 化集成环境（源自 PLC Agent 开发方案第一周 D1-D2 的交付物）。
 
 ## 📋 完成的任务
 
@@ -36,16 +36,21 @@
 ## 📂 目录结构
 
 ```
-W1-D1-D2/
+runtime/
 ├── README.md                    # 本文档
+├── DEPLOY.md                   # 部署指南
 ├── docker-compose.yml          # Docker Compose 配置
 ├── Dockerfile.plc-dev          # 自定义 Docker 镜像
 ├── scripts/                    # 自动化脚本
+│   ├── build-matiec-base.sh    # 构建 MatIEC 基础镜像（前置必需）
 │   ├── verify_environment.sh   # 环境验证脚本
 │   ├── plc_build.sh           # ST → Runtime 编译部署脚本
-│   └── test_api.sh            # REST API 测试脚本
+│   ├── test_api.sh            # REST API 测试脚本
+│   └── quick_verify.sh        # 宿主机一键端到端验证
+├── plugins/                    # 运行时插件（recorder 等）
 └── samples/                    # 示例 ST 程序
-    ├── simple_counter.st       # 简单计数器示例
+    ├── simple_counter.st       # 故意写坏的样例（located 变量带初始化,matiec 拒收,供错误路径测试）
+    ├── simple_counter_fixed.st # 简单计数器示例（可编译版本）
     └── traffic_light.st        # 交通灯控制示例
 ```
 
@@ -60,7 +65,7 @@ W1-D1-D2/
 自建一个 amd64 基础镜像 `openplc-runtime-matiec:main`：
 
 ```bash
-cd W1-D1-D2
+cd sema-plc-tools/runtime
 ./scripts/build-matiec-base.sh        # clone main + docker build（首次约几分钟）
 docker compose up -d --build          # 在该基础镜像上叠 matiec/xml2st/rusty
 ```
@@ -71,7 +76,7 @@ docker compose up -d --build          # 在该基础镜像上叠 matiec/xml2st/r
 ### 快速一键验证 (推荐)
 
 ```bash
-cd W1-D1-D2
+cd sema-plc-tools/runtime
 
 # 一键验证所有功能
 ./scripts/quick_verify.sh
@@ -84,7 +89,7 @@ cd W1-D1-D2
 ### 1. 构建和启动环境
 
 ```bash
-cd W1-D1-D2
+cd sema-plc-tools/runtime
 
 # 构建自定义镜像并启动服务
 docker-compose up --build -d
@@ -274,7 +279,7 @@ docker-compose logs --tail=20 openplc-runtime
 
 ## 🎯 验证成功标准
 
-如果看到以下结果，说明 W1 D1-D2 环境部署成功：
+如果看到以下结果，说明运行时环境部署成功：
 
 1. **✅ Docker 容器启动**: `docker-compose ps` 显示容器运行
 2. **✅ API 服务响应**: `/api/ping` 返回认证提示
@@ -371,7 +376,7 @@ curl -k -X POST https://localhost:8443/api/upload-file -F "file=@program.zip"
 ### verify_environment.sh
 验证所有工具和环境配置：
 ```bash
-# 检查 9 个关键组件
+# 检查 7 个关键组件
 ./verify_environment.sh
 ```
 
@@ -382,10 +387,10 @@ curl -k -X POST https://localhost:8443/api/upload-file -F "file=@program.zip"
 ./plc_build.sh <st_file> [runtime_url] [auth_token]
 
 # 示例
-./plc_build.sh simple_counter.st https://localhost:8443
+./plc_build.sh simple_counter_fixed.st https://localhost:8443
 
 # 详细输出
-VERBOSE=1 ./plc_build.sh simple_counter.st
+VERBOSE=1 ./plc_build.sh simple_counter_fixed.st
 ```
 
 ### test_api.sh
@@ -413,14 +418,12 @@ VERBOSE=1 ./plc_build.sh simple_counter.st
 ## 📊 测试结果
 
 环境验证脚本测试项目：
-- ✅ matiec (iec2c) 二进制可用
-- ✅ xml2st 二进制可用  
-- ✅ matiec 库文件存在
-- ✅ ST → C 编译功能
+- ✅ matiec (iec2c) 编译功能
+- ✅ xml2st 二进制可用
+- ✅ matiec 库头文件存在
 - ✅ debug.c 生成功能
 - ✅ glueVars.c 生成功能
-- ✅ OpenPLC Runtime 进程运行
-- ✅ REST API 响应
+- ✅ OpenPLC Runtime API 响应
 - ✅ 工作目录结构
 
 API 测试脚本验证项目：

@@ -1,12 +1,12 @@
 # SemaBridge:内嵌 Agent 集成
 
-`server/sema-bridge.ts` 是后端最大的单文件(约 770 行):它把 `sema-core` Agent 框架**内嵌**在 Web 后端进程里,负责会话生命周期、sema-core 事件到前端消息的翻译、工作区种子化与 `.st` 文件实时同步。它不直接持有 WebSocket——一切输入输出都经 [事件总线](wiki/web/realtime) 收发。
+`server/sema-bridge.ts` 是后端最大的单文件(约 790 行):它把 `sema-core` Agent 框架**内嵌**在 Web 后端进程里,负责会话生命周期、sema-core 事件到前端消息的翻译、工作区种子化与 `.st` 文件实时同步。它不直接持有 WebSocket——一切输入输出都经 [事件总线](wiki/web/realtime) 收发。
 
 > `sema-core` 以 tarball 形式 vendored 在 `sema-plc-web/vendor/sema-core-2.0.5.tgz`,`package.json` 里经 `"sema-core": "file:vendor/sema-core-2.0.5.tgz"` 安装——需要 `tool:execution:start` 等事件,npm 发布版尚未包含。
 
 ## SemaCore / SemaSession 生命周期
 
-`start()` 的顺序(`sema-bridge.ts:58`):
+`start()` 的顺序(`sema-bridge.ts:62`):
 
 1. `setupWorkspaceIfNeeded(workspace)` —— 工作区种子化(见下)
 2. `new SemaCore({...})` —— 关键构造参数:

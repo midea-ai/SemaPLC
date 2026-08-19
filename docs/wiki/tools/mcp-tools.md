@@ -54,6 +54,10 @@ node dist/cli.js serve --lite    # 精简工具面,见下文
 
 设计意图:把验证类工具从 MCP 面上**物理移除**,验证只能走声明式 verify runner(见 [独立 CLI](wiki/tools/cli) 的 `verify` 命令),堵死弱模型退回"force → read"人肉验证老路。`sema-plc-web` 工作区种子里的 `.mcp.json` 默认即以 `--lite` 启动。
 
+## engineless 模式
+
+第三种工具面收窄,可叠加在 `--lite` 之上:环境变量 `PLC_ENGINE=none`(由宿主在探测不到 docker/podman 且无可达远程 OpenPLC 时注入)时,工具面收窄为 2 个纯本地工具:`plc_detectIO`、`plc_buildSimulation`——既不 `docker exec` 也不打 REST。其余工具从 `ListTools` 物理移除,`CallTool` 兜底拒绝并明示"这不是 ST 代码问题,重试无用"。机制详见 [状态、配置与安全边界](wiki/tools/state-config)。
+
 ## 环境变量
 
 | 变量 | 默认值 | 说明 |
@@ -62,3 +66,4 @@ node dist/cli.js serve --lite    # 精简工具面,见下文
 | `PLC_CONTAINER` | `openplc-plc-dev` | 容器名 |
 | `PLC_USER` / `PLC_PASSWORD` | `admin` / `admin123` | 运行时凭据 |
 | `PLC_STATE_FILE` | `~/.plc-tools/state.json` | 缓存 `variableMap` 与 `zipPath` |
+| `PLC_ENGINE` | 无 | `none` 时进入 engineless 模式(见上文) |

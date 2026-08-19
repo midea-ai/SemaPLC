@@ -289,7 +289,7 @@ export const LITE_TOOLS = new Set(['plc_status', 'plc_readVariables', 'plc_getLo
 // 反复重试,烧 token 还把好代码改坏。工具不在列表里,它自然只做写码和讲解。
 export const OFFLINE_TOOLS = new Set(['plc_detectIO', 'plc_buildSimulation'])
 
-/** PLC_ENGINE=none 由扩展在探测不到 docker/podman 时注入(见 sema-plc-vscode/src/server-manager.ts)。 */
+/** PLC_ENGINE=none 由宿主(如 VSCode 扩展,现独立走 vscode-插件 分支)在探测不到 docker/podman 时注入。 */
 export function isEngineless(): boolean { return process.env.PLC_ENGINE === 'none' }
 
 export function filterToolsForLite(lite: boolean, engineless = false) {

@@ -45,7 +45,7 @@ docker compose up -d --build   # idempotent; first build takes several minutes
 ```bash
 npm install
 npm run build               # tsc → dist/  (rebuild after editing src/)
-npm test                    # 542 unit tests, no Docker needed
+npm test                    # 555 unit tests, no Docker needed
 ```
 
 ## 3. Use it — the CLI
@@ -113,7 +113,7 @@ The full I/O contract for every tool lives in [`src/types.ts`](src/types.ts).
 ## 6. Tests
 
 ```bash
-npm test                    # 542 unit tests — no container needed
+npm test                    # 555 unit tests — no container needed
 npm run test:integration    # full chain (compile → upload → start → readVariables → stop); needs the container running
 ```
 
@@ -127,5 +127,7 @@ The bundled samples make a quick manual check easy: `runtime/samples/simple_coun
 | `PLC_CONTAINER` | `openplc-plc-dev` | Docker container name |
 | `PLC_USER` / `PLC_PASSWORD` | `admin` / `admin123` | Runtime credentials |
 | `PLC_STATE_FILE` | `~/.plc-tools/state.json` | Shared state cache (`variableMap`, `zipPath`) |
+
+These are the everyday ones; `src/config.ts` reads a few more (`PLC_CHECK_STDLIB_DIR`, `PLC_SCENE_FILE`, `PLC_IO_MAP_FILE`, `PLC_WORKSPACE`, `PLC_MODBUS_PORT`, `PLC_POOL_SIZE`, `PLC_DOCKER_BIN`) — see the wiki's state-config page for the full table.
 
 Override any of them inline, e.g. `PLC_URL=https://192.168.1.100:8443 node dist/cli.js status`.

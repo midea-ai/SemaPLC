@@ -88,7 +88,7 @@ See [`sema-plc-tools/README.md`](sema-plc-tools/README.md) for the full command 
 
 - **Node.js ≥ 18** and **npm**
 - **Docker** (Docker Desktop on macOS / Windows) — for the OpenPLC Runtime container
-- An **LLM API key** (DeepSeek recommended; OpenAI-compatible providers such as MiniMax / Anthropic / Gemini / OpenAI / xAI / Groq / OpenRouter / Qwen / Kimi are also supported)
+- An **LLM API key** (DeepSeek recommended; Anthropic and OpenAI-compatible providers such as MiniMax / Gemini / OpenAI / xAI / Groq / OpenRouter / Qwen / Kimi are also supported)
 
 ### Setup
 

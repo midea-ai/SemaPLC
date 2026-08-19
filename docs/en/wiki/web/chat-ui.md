@@ -48,7 +48,7 @@ Nearly all stores respond to `workspace:switching` by clearing themselves -- a w
 - **Header**: Agent badge + status badge (`processing` -> Processing; otherwise Ready/Connecting/Offline based on WS status) + `PlanIndicator` + collapse button (the panel is hosted by App.tsx's `react-resizable-panels` and can be folded as a whole);
 - **Empty state**: 3 example scenario chips randomly drawn from `i18n/scenarios` (crypto RNG shuffle; if "shuffle" draws exactly the same set as the current one, it redraws once); clicking one sends the preset prompt;
 - **Message stream**: one `Bubble` per `ChatMessage`. Blocks in an agent turn are rendered in order, first folded by `groupBlocks()` (see below); `status === 'error'` shows a retry button (resending the last user input), `interrupted` shows an interruption notice; auto-scroll only sticks to the bottom when the user is within 40px of it (`pinnedRef`), and the collapsed state skips scrollHeight reads to avoid reflowing hidden elements;
-- **Input area**: thinking toggle (sends `model:set-thinking`), textarea (Enter to send, Shift+Enter for a newline, IME composition guarded by `shouldSubmitOnEnter` against accidental sends), and the send button turns into a stop button while `processing` (sending `agent:interrupt`).
+- **Input area**: thinking toggle (sends `model:set-thinking`), textarea (Enter to send, Shift+Enter for a newline, IME composition guarded by `shouldSubmitOnEnter` against accidental sends), the send button turns into a stop button while `processing` (sending `agent:interrupt`), and a context-usage ring (usageRing, rendered from `agent:usage`); when no model or no container engine is available, a persistent StatusBar above the input area shows the degradation notice, and separately `inputDisabled` blocks invalid input when the WS is down or no model is active (no-engine does not block — you can still write code).
 
 The render components for the three block kinds (`components/left/blocks/`):
 
@@ -77,7 +77,7 @@ export function pickRenderer(toolName: string): ToolRenderer | null {
 }
 ```
 
-`shortName()` (`ToolCallCard.tsx`) strips the MCP prefix `mcp__<server>__`, so registry keys are bare tool names. Each card file calls `registerRenderer` itself at the bottom of its module, and `ToolBlock` does only three things: hide todo tools -> use the dedicated card if `pickRenderer` hits -> otherwise fall back to the generic `ToolCallCard` (three expandable JSON sections for params/streamed output/result, truncated at 30 lines).
+`shortName()` (`ToolCallCard.tsx`) strips the MCP prefix `mcp__<server>__`, so registry keys are bare tool names. All `registerRenderer` calls are centralized in `registry.tsx` (each card is imported and registered in place), and `ToolBlock` does only three things: hide todo tools -> use the dedicated card if `pickRenderer` hits -> otherwise fall back to the generic `ToolCallCard` (three expandable JSON sections for params/streamed output/result, truncated at 30 lines).
 
 The backend's `block-mapper.ts` applies three truncations on the display path (result/stream 16KB, input 8KB; display-only, never affecting the real results the Agent receives); on the frontend, `parseResult()` in `tools/parse.ts` handles them uniformly: check the `truncated` flag first, then attempt JSON.parse, falling back to the raw text on failure. Every card degrades gracefully on this basis -- when parsing fails, it still shows the `ToolShell` wrapper plus the raw text.
 

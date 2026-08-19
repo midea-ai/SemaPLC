@@ -71,7 +71,7 @@ Full table of internal commands (`event-bus.ts:12`):
 5. On success: emit `plc:state` (finalStatus) + re-read `state.json` and emit `plc:variables` (aligned with the bridge's Agent path); on failure: `emitBuildFailureDetail()` sends the **full diagnostics** of each stage (matiec/gcc/start) line by line to the bottom log (iec2c errors carry line/column numbers, capped at 20 entries), instead of just a single "✗ compile"
 6. `setMuted(false)` in `finally`
 
-**Force (`internal:plc-force`)**: variable forcing for simulation interaction. The entry has a guard -- rejected when `.plc-act/running.lock` exists and its mtime is < 150s old (the verify runner is running, preventing user clicks and the runner's workload from overwriting each other; stale locks do not block). After execution (success or not), `setMuted(false)` clears last-seen, prompting the monitor to immediately re-emit values on the next tick.
+**Force (`internal:plc-force`)**: variable forcing for simulation interaction. The entry has a guard -- rejected when `.plc-act/running.lock` exists and its mtime is < 150s old (the verify runner is running, preventing user clicks and the runner's workload from overwriting each other; stale locks do not block). After execution (whether the result succeeds or fails; except when an exception is thrown), `setMuted(false)` clears last-seen, prompting the monitor to immediately re-emit values on the next tick.
 
 **Stop** follows the same pattern (tool card + muting); **fetchLogs** emits neither a tool card nor mutes; logs are sent line by line as `log` (source=`runtime`), and runtime errors parsed out by `getLogs` (watchdog / scan_overrun / segfault...) are sent in structured form as `plc:runtime-error`.
 
@@ -97,6 +97,9 @@ Full table of internal commands (`event-bus.ts:12`):
 | `agent:usage` | Context usage (useTokens/maxTokens) |
 | `scene:ready` | Process simulation scene |
 | `model:config` | Model configuration state |
+| `plc:force-result` | Forced-variable set (accumulated snapshot) |
+
+`plc:force-result` is an incremental event, so caching only the last message would restore just the most recent operation; the gateway instead maintains an **accumulated equivalent snapshot** for it in dispatch — otherwise after a reconnect (server restart / page reload) the client's forced set would reset while the runtime forces stay active, leaving the user unable to release them.
 
 When `workspace:switching` arrives, **the entire sticky cache is cleared** (repopulated by the hydration messages after the switch completes). Chat blocks never enter sticky -- after replay the gateway emits `internal:client-connected`, and the bridge broadcasts `agent:turn-snapshot` to fill in the in-progress turn (see [SemaBridge](en/wiki/web/sema-bridge)).
 
@@ -141,7 +144,7 @@ When `workspace:switching` arrives, **the entire sticky cache is cleared** (repo
 | `plc:variables` | `VariableEntry[]` (index/name/type/location) | Yes |
 | `plc:values` | `Record<name, VariableValue>` | Yes |
 | `plc:runtime-error` | Structured runtime error (type/message/advice) | No |
-| `plc:force-result` | forced / released / failed / error | No |
+| `plc:force-result` | forced / released / failed / error | Yes (accumulated snapshot) |
 | `scene:ready` | `SceneSpec` + validation errors/warnings | Yes |
 | `model:config` | `ModelConfigState` (selected/active/options/thinking) | Yes |
 | `model:key-result` | Key-entry probe result; failures carry message + curl | No |

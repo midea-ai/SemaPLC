@@ -12,10 +12,12 @@ Entry point `handleCheck` (`src/tools/check.ts`). This is a **different compiler
 
 ```bash
 STD=$(ls /opt/iec61131-stdlib/*.st 2>/dev/null | grep -Ev "bit_conversion|string_conversion|string_functions|extra_functions")
-plc --check /tmp/plc_check_input.st $STD 2>&1
+plc --check /tmp/plc-check-XXXXXX.st $STD 2>&1
 ```
 
-All three implementation details have a reason:
+The landing path inside the container is **randomized per call** (it reuses the already-randomized `mkdtemp` directory name as the file name, e.g. `/tmp/plc-check-XXXXXX.st`, removed with `rm -f` in the finally block): an earlier version hard-coded `/tmp/plc_check_input.st`, so two concurrent `handleCheck` calls would overwrite each other's source and attach A's diagnostics to B's code — since fixed.
+
+The remaining implementation details all have a reason:
 
 - **Include stdlib declarations**: the standard-function `.st` declarations under `PLC_CHECK_STDLIB_DIR` (default `/opt/iec61131-stdlib`) are passed in alongside the user code; otherwise calls to `TON`, type conversion functions, etc. in user code would be falsely reported as undefined;
 - **Exclude 4 files**: `SKIP_STDLIB = ['bit_conversion', 'string_conversion', 'string_functions', 'extra_functions']` — these files make rusty v0.5.0's `--check` panic outright and must be removed from the declaration set;
@@ -46,10 +48,10 @@ rusty emits codespan-style colored diagnostics. `parseRustyErrors` (`src/tools/r
 
 ```ts
 const headRe = /error\[(E\d+)\]:\s*(.+?)\s*$/
-const locRe = /┌─\s*(?:.+?):(\d+):(\d+)/
+const locRe = /┌─\s*(.+?):(\d+):(\d+)/
 ```
 
-Each match produces a `RustyError { code, message, line, col }`; when the location line is missing, `line`/`col` are `null` (the error is kept, only the position is lost). `CheckResult.raw` retains the full de-colored output as a fallback for the agent to read when the structured fields are not enough.
+Each match produces a `RustyError { code, message, line, col, file? }`; when the location line is missing, `line`/`col` are `null` (the error is kept, only the position is lost). The path is **captured**, not skipped: a single `plc --check` run checks a dozen stdlib `.st` files alongside the user code, and most errors may come from `/opt/iec61131-stdlib/*.st` — the `file` field lets consumers tell stdlib errors from user-code errors (path not under `checkStdlibDir` ⇔ user code). `CheckResult.raw` retains the full de-colored output as a fallback for the agent to read when the structured fields are not enough.
 
 ## plc_detectIO: Offline IO Scan
 

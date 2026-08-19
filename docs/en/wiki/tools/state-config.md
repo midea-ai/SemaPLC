@@ -43,8 +43,11 @@ Two defenses (`state.ts`): on read, a missing file or corrupted JSON always retu
 | `PLC_WORKSPACE` | None | Workspace root for resolving relative `stPath`; also determines where the verify gate's `.plc-act/latest.json` lives |
 | `PLC_MODBUS_PORT` | None (`null` = off) | When set, `plc_compile` injects `modbus_slave.json` into the ZIP and OpenPLC opens a Modbus TCP slave on this port (for FUXA integration) |
 | `PLC_POOL_SIZE` | `1` (serial) | Verify scenario parallel pool size, clamped to `[1, 16]`; >1 fans scenarios out to multiple instances |
+| `PLC_DOCKER_BIN` | `docker` | Container-engine executable replacement (podman / colima, etc.) |
 
-**Container-name injection defense**: `PLC_CONTAINER` is validated right at the configuration entry point against Docker's own legal character set `^[a-zA-Z0-9][a-zA-Z0-9_.-]*$`, throwing immediately if illegal — the value flows downstream as a `docker exec` argument, so a single-point sanitization frees every `execFile/spawn` from command injection.
+In addition, `server.ts` reads one variable directly, outside of `loadConfig()`: `PLC_ENGINE` (`none` triggers the engineless tool-surface reduction, see below).
+
+**Container-name injection defense**: `PLC_CONTAINER` is validated right at the configuration entry point against Docker's own legal character set `^[a-zA-Z0-9][a-zA-Z0-9_.-]*$`, throwing immediately if illegal — the value flows downstream as a `docker exec` argument, so a single-point sanitization frees every `execFile/spawn` from command injection. `PLC_DOCKER_BIN` gets the same treatment: it must pass the whitelist `^[A-Za-z0-9._/-]+$` before reaching `execFile`.
 
 ## MCP Time Budget (mcpBudget.ts)
 
@@ -86,6 +89,8 @@ export const LITE_TOOLS = new Set(['plc_status', 'plc_readVariables', 'plc_getLo
 ```
 
 Lite mode does **physical removal**, not prompt-level discouragement: `filterToolsForLite` makes `ListTools` return only the 6 tools on the list, and `isToolAllowed` intercepts again in `CallTool` (even a model calling from memory receives a structured refusal, redirecting to the verify runner). Design intent (source comments cite spec §4 / review P0-1): with verification-class tools like `plc_forceVariables` / `plc_verifyBehavior` / `plc_trace` removed from the MCP surface, **verification can only go through the declarative verify runner** — structurally sealing the channel by which a weak model, after an assertion failure, slides back into the unreliable old "force inputs → read outputs" habit. The 6 tools that remain are all read-side/low-risk or unavoidable: state and variable snapshots, logs, IO detection, simulation-scene generation, and stop. Compiling and running in a lite environment likewise go through the runner (the CodeAct path); see [Declarative Verify Runner](en/wiki/tools/verify-runner).
+
+**Engineless reduction**: a third tool-surface reduction alongside `--lite`, and stackable on top of it. When `PLC_ENGINE=none` (injected by the host when neither docker/podman nor a reachable remote OpenPLC can be detected), `isEngineless()` kicks in and the tool surface narrows to `OFFLINE_TOOLS = {plc_detectIO, plc_buildSimulation}` — two purely local tools that neither `docker exec` nor call REST. Again physical removal rather than error-based discouragement: if the tools stayed listed, the agent would treat "docker: command not found" as a code problem and start speculatively rewriting ST; with them removed it naturally sticks to writing code and explaining. The `CallTool` fallback refusal also states explicitly that "this is not an ST code problem — retrying won't help".
 
 ```mermaid
 flowchart LR

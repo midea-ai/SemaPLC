@@ -8,7 +8,6 @@ flowchart LR
     P --> LANG["st-language.ts<br/>LRLanguage + 补全"]
     H[st-highlight.ts<br/>styleTags] --> LANG
     D[st-docs.ts<br/>文档数据] --> LANG
-    D --> HOV[st-hover.ts<br/>hoverTooltip]
     LANG --> CM["CodeEditor.tsx<br/>EditorView"]
     P --> AST["transformer/ast<br/>cst-to-ast"]
 ```
@@ -27,7 +26,7 @@ flowchart LR
 | 字面量 | 十进制/小数、`16#FF`、`2#1010_0101`、`TRUE/FALSE`、单双引号字符串、`T#5s`、`D#2024-01-15`、`TOD#14:30:00`、`DT#...`、限定枚举值 `TrafficLight#Yellow` |
 | 注释 | `// 行注释` 与 `(* 块注释 *)` |
 
-关键实现细节:关键字通过 `kw<term> { @specialize<Identifier, term> }` 从标识符特化而来(ST 关键字不与标识符冲突);token 优先级显式声明(时间/日期字面量 > 十六进制/二进制 > 布尔 > 直接地址 > 数字 > 标识符),避免 `T#5s`、`16#FF` 被拆散。语法**不含** `CONFIGURATION` 块——所以梯形图路径在解析前会剥掉它(`LadderCanvas.stripConfigurationBlock`)。
+关键实现细节:关键字通过 `kw<term> { @specialize<Identifier, term> }` 从标识符特化而来(ST 关键字不与标识符冲突);token 优先级显式声明(时间/日期字面量 > 十六进制/二进制 > 布尔 > 直接地址 > 数字 > 标识符),避免 `T#5s`、`16#FF` 被拆散。语法**不含** `CONFIGURATION` 块——所以梯形图路径在解析前会剥掉它(`lang/st-source.ts` 的 `stripConfigurationBlock`,由 `LadderCanvas` 调用)。
 
 ## CodeMirror 集成:st-language.ts + st-highlight.ts
 
@@ -53,7 +52,7 @@ export function structuredText(): LanguageSupport {
 
 `components/center/CodeEditor.tsx` 挂载 EditorView 时通过 `Compartment` 装配语言扩展:YAML/JSON/TOML 文件不启用 `structuredText()`(编辑器内为纯文本;聊天流里的代码块高亮由 `lib/codeHighlight` 的轻量行高亮处理),其余扩展名(含 `.st`,以及 `CodeView.langOf` 兜底归类的未知扩展名)都按 ST 处理。
 
-## hover 文档:st-hover.ts 与 st-docs.ts
+## 内联文档:st-docs.ts
 
 `st-docs.ts` 是纯数据模块,三张表:
 
@@ -63,15 +62,9 @@ export function structuredText(): LanguageSupport {
 | `DATA_TYPE_DOCS` | BOOL/INT/DINT/UINT/REAL/TIME/STRING | 描述 + 取值范围 + 声明示例 |
 | `KEYWORD_DOCS` | IF/CASE/FOR 等控制流关键字 | 签名 + 示例 |
 
-`getSTDocumentation(symbol)` 按 `toUpperCase()` 依次查三张表;`formatDocumentationHTML()` 产出 hover 用 HTML(内容全部 `escapeHTML`),`formatDocumentationText()` 产出补全 info 面板用纯文本。同一份数据喂两个消费端,补全与 hover 的说明保持一致。
+`getSTDocumentation(symbol)` 按 `toUpperCase()` 依次查三张表;`formatDocumentationText()` 产出补全 info 面板用的纯文本,`formatDocumentationHTML()` 产出 HTML 版本(内容全部 `escapeHTML`,当前编辑器内暂无消费端)。
 
-`st-hover.ts` 的 `stHoverTooltip()` 基于 CodeMirror `hoverTooltip`:
-
-1. `syntaxTree(view.state).resolveInner(pos, side)` 取指针处语法节点,注释/字符串内直接跳过;
-2. 用正则 `[a-zA-Z0-9_]` 找词边界(≥2 字符),查 `getSTDocumentation`;
-3. 命中则返回 `.st-hover-tooltip` DOM,定位在词上方。
-
-触发词典是静态的:只覆盖内置 FB、类型和关键字,不做用户变量的语义查询。注意:`stHoverTooltip` 目前只在 `st-hover.ts` 中定义导出,`CodeEditor.tsx` 的扩展列表尚未把它接入 EditorView(补全 info 面板已生效,悬停提示待挂载)。
+触发词典是静态的:只覆盖内置 FB、类型和关键字,不做用户变量的语义查询。早期版本曾由 `st-hover.ts` 提供悬停提示(hoverTooltip),该文件已在语言服务重构中删除;目前文档数据仅通过补全 info 面板呈现。
 
 ## 编辑器与文件树 / 后端文件同步
 

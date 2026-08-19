@@ -54,6 +54,10 @@ node dist/cli.js serve --lite    # narrowed tool surface, see below
 
 Design intent: **physically remove** the verification-class tools from the MCP surface so that verification can only go through the declarative verify runner (see the `verify` command in [Standalone CLI](en/wiki/tools/cli)), closing off the old path where weak models fall back to manual "force → read" verification. The `.mcp.json` in the `sema-plc-web` workspace seed starts with `--lite` by default.
 
+## Engineless Mode
+
+A third tool-surface reduction, stackable on top of `--lite`: when the environment variable `PLC_ENGINE=none` (injected by the host when neither docker/podman nor a reachable remote OpenPLC can be detected), the tool surface narrows to 2 purely local tools: `plc_detectIO` and `plc_buildSimulation` — neither `docker exec`s nor calls REST. All other tools are physically removed from `ListTools`, and the `CallTool` fallback refuses with an explicit "this is not an ST code problem — retrying won't help". See [State, Configuration and Security Boundaries](en/wiki/tools/state-config) for the mechanism.
+
 ## Environment Variables
 
 | Variable | Default | Description |
@@ -62,3 +66,4 @@ Design intent: **physically remove** the verification-class tools from the MCP s
 | `PLC_CONTAINER` | `openplc-plc-dev` | Container name |
 | `PLC_USER` / `PLC_PASSWORD` | `admin` / `admin123` | Runtime credentials |
 | `PLC_STATE_FILE` | `~/.plc-tools/state.json` | Caches `variableMap` and `zipPath` |
+| `PLC_ENGINE` | None | `none` enters engineless mode (see above) |

@@ -8,7 +8,6 @@ flowchart LR
     P --> LANG["st-language.ts<br/>LRLanguage + completion"]
     H[st-highlight.ts<br/>styleTags] --> LANG
     D[st-docs.ts<br/>documentation data] --> LANG
-    D --> HOV[st-hover.ts<br/>hoverTooltip]
     LANG --> CM["CodeEditor.tsx<br/>EditorView"]
     P --> AST["transformer/ast<br/>cst-to-ast"]
 ```
@@ -27,7 +26,7 @@ flowchart LR
 | Literals | Decimal/fractional, `16#FF`, `2#1010_0101`, `TRUE/FALSE`, single- and double-quoted strings, `T#5s`, `D#2024-01-15`, `TOD#14:30:00`, `DT#...`, qualified enum values `TrafficLight#Yellow` |
 | Comments | `// line comments` and `(* block comments *)` |
 
-Key implementation details: keywords are specialized from identifiers via `kw<term> { @specialize<Identifier, term> }` (ST keywords do not conflict with identifiers); token precedence is declared explicitly (time/date literals > hex/binary > booleans > direct addresses > numbers > identifiers) to prevent `T#5s` or `16#FF` from being split apart. The grammar does **not** include the `CONFIGURATION` block -- which is why the ladder diagram path strips it before parsing (`LadderCanvas.stripConfigurationBlock`).
+Key implementation details: keywords are specialized from identifiers via `kw<term> { @specialize<Identifier, term> }` (ST keywords do not conflict with identifiers); token precedence is declared explicitly (time/date literals > hex/binary > booleans > direct addresses > numbers > identifiers) to prevent `T#5s` or `16#FF` from being split apart. The grammar does **not** include the `CONFIGURATION` block -- which is why the ladder diagram path strips it before parsing (`stripConfigurationBlock` in `lang/st-source.ts`, called by `LadderCanvas`).
 
 ## CodeMirror Integration: st-language.ts + st-highlight.ts
 
@@ -53,7 +52,7 @@ export function structuredText(): LanguageSupport {
 
 When `components/center/CodeEditor.tsx` mounts the EditorView, it assembles the language extension through a `Compartment`: YAML/JSON/TOML files do not enable `structuredText()` (they are plain text in the editor; code-block highlighting in the chat stream is handled by the lightweight line highlighter in `lib/codeHighlight`), while all other extensions (including `.st`, as well as unknown extensions that `CodeView.langOf` falls back to classifying) are treated as ST.
 
-## Hover Documentation: st-hover.ts and st-docs.ts
+## Inline Documentation: st-docs.ts
 
 `st-docs.ts` is a pure data module with three tables:
 
@@ -63,15 +62,9 @@ When `components/center/CodeEditor.tsx` mounts the EditorView, it assembles the 
 | `DATA_TYPE_DOCS` | BOOL/INT/DINT/UINT/REAL/TIME/STRING | Description + value range + declaration example |
 | `KEYWORD_DOCS` | Control-flow keywords such as IF/CASE/FOR | Signature + example |
 
-`getSTDocumentation(symbol)` looks up the three tables in order after `toUpperCase()`; `formatDocumentationHTML()` produces the HTML used for hover (all content passes through `escapeHTML`), and `formatDocumentationText()` produces plain text for the completion info panel. The same data feeds both consumers, keeping completion and hover descriptions consistent.
+`getSTDocumentation(symbol)` looks up the three tables in order after `toUpperCase()`; `formatDocumentationText()` produces plain text for the completion info panel, and `formatDocumentationHTML()` produces an HTML version (all content passes through `escapeHTML`; it currently has no consumer inside the editor).
 
-`stHoverTooltip()` in `st-hover.ts` is built on CodeMirror's `hoverTooltip`:
-
-1. `syntaxTree(view.state).resolveInner(pos, side)` gets the syntax node at the pointer; inside comments/strings it bails out immediately;
-2. Word boundaries are found with the regex `[a-zA-Z0-9_]` (>= 2 characters), then `getSTDocumentation` is queried;
-3. On a hit, a `.st-hover-tooltip` DOM element is returned, positioned above the word.
-
-The trigger dictionary is static: it only covers built-in FBs, types, and keywords, with no semantic lookup of user variables. Note: `stHoverTooltip` is currently only defined and exported in `st-hover.ts`; the extension list in `CodeEditor.tsx` has not yet wired it into the EditorView (the completion info panel is live, the hover tooltip is pending mounting).
+The trigger dictionary is static: it only covers built-in FBs, types, and keywords, with no semantic lookup of user variables. Earlier versions shipped a hover tooltip (`hoverTooltip`) provided by `st-hover.ts`; that file was removed in the language-service refactor, so the documentation data is currently surfaced only through the completion info panel.
 
 ## Editor and File Tree / Backend File Sync
 

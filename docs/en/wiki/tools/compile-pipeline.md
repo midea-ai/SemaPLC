@@ -71,10 +71,10 @@ The ZIP also carries two kinds of "non-compile artifacts": placeholder `c_blocks
 `parseIec2cErrors` (`src/compiler.ts`) accepts both of matiec's diagnostic formats (`file:line-col..line-col:` and the older `file:line:col-line:col:`) with a single regex:
 
 ```ts
-const pattern = /^\S+:(\d+)[-:](\d+)(?:\.\.|-)\d+[-:]\d+:\s+(error|warning):\s+(.+)$/gm
+const pattern = /^\S+:(\d+)[-:](\d+)(?:\.\.|-)(\d+)[-:](\d+):\s+(error|warning):\s+(.+)$/gm
 ```
 
-Each error carries `line` / `col` / `severity` / `message`, and the corresponding `sourceLine` is extracted from the supplied ST source by line number — the agent fixing the error never has to resolve line numbers itself. Then `adviceForIec2cError` (`src/tools/iec2cErrorParser.ts`) matches the message against a pattern table and attaches `advice` on a hit. The pattern table comes from empirical statistics over 325 benchmark sessions; the top categories:
+Each error carries `line` / `col` / `endLine` / `endCol` (the closed-interval end, letting the diagnostic squiggle cover the whole token) / `severity` / `message`, and the corresponding `sourceLine` is extracted from the supplied ST source by line number — the agent fixing the error never has to resolve line numbers itself. Then `adviceForIec2cError` (`src/tools/iec2cErrorParser.ts`) matches the message against a pattern table and attaches `advice` on a hit. The pattern table comes from empirical statistics over 325 benchmark sessions; the top categories:
 
 | matiec error | Advice highlights |
 |---|---|

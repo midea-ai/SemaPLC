@@ -71,7 +71,7 @@ sequenceDiagram
 5. 成功:发 `plc:state`(finalStatus)+ 重读 `state.json` 发 `plc:variables`(与 bridge 的 Agent 路径对齐);失败:`emitBuildFailureDetail()` 把 matiec/gcc/start 各阶段的**完整诊断**逐条发到底部日志(iec2c 错误带行列号,上限 20 条),不是只给一句 "✗ compile"
 6. `finally` 里 `setMuted(false)`
 
-**Force(`internal:plc-force`)**:仿真交互的变量强制。入口有一道守卫——`.plc-act/running.lock` 存在且 mtime < 150s 时拒绝(verify runner 运行中,防止用户点击与 runner 工况互相覆盖;陈旧 lock 不拦)。执行完成后(无论成败)`setMuted(false)` 清空 last-seen,促使 monitor 下一 tick 立即重发值。
+**Force(`internal:plc-force`)**:仿真交互的变量强制。入口有一道守卫——`.plc-act/running.lock` 存在且 mtime < 150s 时拒绝(verify runner 运行中,防止用户点击与 runner 工况互相覆盖;陈旧 lock 不拦)。执行完成后(无论 result 成败;抛异常分支除外)`setMuted(false)` 清空 last-seen,促使 monitor 下一 tick 立即重发值。
 
 **Stop** 同模式(工具卡片 + 静音);**fetchLogs** 不发工具卡片也不静音,日志逐行以 `log`(source=`runtime`)下发,`getLogs` 解析出的 runtime 错误(watchdog / scan_overrun / segfault…)以 `plc:runtime-error` 结构化下发。
 
@@ -97,6 +97,9 @@ sequenceDiagram
 | `agent:usage` | 上下文用量(useTokens/maxTokens) |
 | `scene:ready` | 过程仿真场景 |
 | `model:config` | 模型配置状态 |
+| `plc:force-result` | forced 变量集(累积快照) |
+
+`plc:force-result` 是增量事件,直接缓存最后一条只能恢复最后一次操作,所以网关在 dispatch 里为它维护**累积出来的等价快照**——否则重连(server 重启/页面 reload)后客户端 forced 集清空而运行时强制仍生效,用户就再也解不掉了。
 
 `workspace:switching` 到达时**清空整个 sticky 缓存**(切换完成后由水合消息重新填充)。聊天块不进 sticky——重放后网关发 `internal:client-connected`,由 bridge 广播 `agent:turn-snapshot` 补上进行中的 turn(见 [SemaBridge](wiki/web/sema-bridge))。
 
@@ -141,7 +144,7 @@ sequenceDiagram
 | `plc:variables` | `VariableEntry[]`(index/name/type/location) | 是 |
 | `plc:values` | `Record<name, VariableValue>` | 是 |
 | `plc:runtime-error` | 结构化运行时错误(type/message/advice) | 否 |
-| `plc:force-result` | forced / released / failed / error | 否 |
+| `plc:force-result` | forced / released / failed / error | 是(累积快照) |
 | `scene:ready` | `SceneSpec` + 校验 errors/warnings | 是 |
 | `model:config` | `ModelConfigState`(selected/active/options/thinking) | 是 |
 | `model:key-result` | 填 key 探针结果,失败带 message + curl | 否 |

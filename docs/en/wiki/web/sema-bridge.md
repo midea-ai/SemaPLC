@@ -1,12 +1,12 @@
 # SemaBridge: Embedded Agent Integration
 
-`server/sema-bridge.ts` is the largest single file in the backend (about 770 lines): it **embeds** the `sema-core` Agent framework inside the web backend process and is responsible for session lifecycle, translating sema-core events into frontend messages, workspace seeding, and live `.st` file sync. It does not hold the WebSocket directly -- all input and output flow through the [event bus](en/wiki/web/realtime).
+`server/sema-bridge.ts` is the largest single file in the backend (about 790 lines): it **embeds** the `sema-core` Agent framework inside the web backend process and is responsible for session lifecycle, translating sema-core events into frontend messages, workspace seeding, and live `.st` file sync. It does not hold the WebSocket directly -- all input and output flow through the [event bus](en/wiki/web/realtime).
 
 > `sema-core` is vendored as a tarball at `sema-plc-web/vendor/sema-core-2.0.5.tgz` and installed via `"sema-core": "file:vendor/sema-core-2.0.5.tgz"` in `package.json` -- events such as `tool:execution:start` are required but not yet included in the npm-published version.
 
 ## SemaCore / SemaSession Lifecycle
 
-The sequence in `start()` (`sema-bridge.ts:58`):
+The sequence in `start()` (`sema-bridge.ts:62`):
 
 1. `setupWorkspaceIfNeeded(workspace)` -- workspace seeding (see below)
 2. `new SemaCore({...})` -- key constructor parameters:

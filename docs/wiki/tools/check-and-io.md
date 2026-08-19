@@ -12,10 +12,12 @@
 
 ```bash
 STD=$(ls /opt/iec61131-stdlib/*.st 2>/dev/null | grep -Ev "bit_conversion|string_conversion|string_functions|extra_functions")
-plc --check /tmp/plc_check_input.st $STD 2>&1
+plc --check /tmp/plc-check-XXXXXX.st $STD 2>&1
 ```
 
-三个实现细节都有来由:
+容器内落点**每次随机**(复用 `mkdtemp` 随机化的目录名当文件名,形如 `/tmp/plc-check-XXXXXX.st`,用完在 finally 里 `rm -f`):早期写死 `/tmp/plc_check_input.st` 时,两次 `handleCheck` 并发会互相覆盖源文件,导致 A 的诊断挂到 B 的代码上,已修复。
+
+其余实现细节都有来由:
 
 - **附带 stdlib 声明**:`PLC_CHECK_STDLIB_DIR`(默认 `/opt/iec61131-stdlib`)下的标准函数 `.st` 声明一起传入,否则用户代码里调用 `TON`、类型转换函数等会误报未定义;
 - **排除 4 个文件**:`SKIP_STDLIB = ['bit_conversion', 'string_conversion', 'string_functions', 'extra_functions']`——这几个文件会让 rusty v0.5.0 的 `--check` 直接 panic,必须从声明集中剔除;
@@ -46,10 +48,10 @@ rusty 输出 codespan 风格的彩色诊断。`parseRustyErrors`(`src/tools/rust
 
 ```ts
 const headRe = /error\[(E\d+)\]:\s*(.+?)\s*$/
-const locRe = /┌─\s*(?:.+?):(\d+):(\d+)/
+const locRe = /┌─\s*(.+?):(\d+):(\d+)/
 ```
 
-每条产出 `RustyError { code, message, line, col }`;定位行缺失时 `line`/`col` 为 `null`(不丢错误,只丢位置)。`CheckResult.raw` 保留完整的去色输出,供 agent 在结构化字段不够时兜底阅读。
+每条产出 `RustyError { code, message, line, col, file? }`;定位行缺失时 `line`/`col` 为 `null`(不丢错误,只丢位置)。路径是**捕获**而非跳过:一次 `plc --check` 连同十几个 stdlib `.st` 一起送检,大部分 error 可能来自 `/opt/iec61131-stdlib/*.st`,`file` 字段让消费方能区分 stdlib 报错与用户代码报错(路径不在 `checkStdlibDir` 下 ⇔ 用户代码)。`CheckResult.raw` 保留完整的去色输出,供 agent 在结构化字段不够时兜底阅读。
 
 ## plc_detectIO:离线 IO 扫描
 

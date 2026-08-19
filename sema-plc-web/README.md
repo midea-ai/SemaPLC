@@ -78,22 +78,25 @@ You should see four lines once it's up:
 | `minimax-m2.7` / `minimax-m2.5` | MiniMax-M2.7 / M2.5 | `MINIMAX_API_KEY` |
 | `anthropic` | claude-opus-4-7 | `ANTHROPIC_API_KEY` |
 | `gemini` / `gemini-2.5-flash` / `gemini-2.5-pro` | Gemini 2.5 | `GEMINI_API_KEY` |
+| `gemini-3.5-flash` / `gemini-3.1-pro` | Gemini 3.5 Flash / 3.1 Pro | `GEMINI_API_KEY` |
 | `openai` | gpt-5.4 | `OPENAI_API_KEY` |
 | `gpt-5.5` | gpt-5.5 | `OPENAI_API_KEY` |
 | `xai` | grok-4.3 | `XAI_API_KEY` |
 | `groq` | openai/gpt-oss-120b | `GROQ_API_KEY` |
 | `openrouter` | ~openai/gpt-latest | `OPENROUTER_API_KEY` |
-| `qwen` / `dashscope` | qwen-plus | `QWEN_API_KEY` |
+| `qwen` / `dashscope` | qwen3.7-max | `QWEN_API_KEY` |
+| `qwen-plus` | qwen3.7-plus | `QWEN_API_KEY` |
+| `doubao` / `doubao-turbo` / `doubao-code` | doubao-seed 2.1 Pro / 2.1 Turbo / 2.0 Code | `DOUBAO_API_KEY` |
 | `kimi` / `moonshot` | kimi-k2.6 | `KIMI_API_KEY` |
-| `zai` / `zhipu` | glm-4.7 | `ZAI_API_KEY` |
-| `siliconflow` | Pro/zai-org/GLM-4.7 | `SILICONFLOW_API_KEY` |
+| `zai` / `zhipu` | glm-5.2 | `ZAI_API_KEY` |
+| `bigmodel` | glm-5.2 | `BIGMODEL_API_KEY` |
+| `siliconflow` | Pro/zai-org/GLM-5.2 | `SILICONFLOW_API_KEY` |
 | `together` | MiniMaxAI/MiniMax-M3 | `TOGETHER_API_KEY` |
-| `ollama` | qwen2.5-coder:32b | optional `OLLAMA_API_KEY` |
 | `openai-compatible` / `custom` | your model | `PLC_OPENAI_COMPATIBLE_API_KEY` |
 
 Every preset supports overrides: `<PREFIX>_MODEL`, `<PREFIX>_BASE_URL`, `<PREFIX>_MAX_TOKENS`, and `<PREFIX>_CONTEXT_LENGTH` (for example `OPENAI_MODEL`, `QWEN_BASE_URL`, or `GROQ_MAX_TOKENS`). The generic OpenAI-compatible entry uses `PLC_OPENAI_COMPATIBLE_MODEL`, `PLC_OPENAI_COMPATIBLE_BASE_URL`, `PLC_OPENAI_COMPATIBLE_API_KEY`, `PLC_OPENAI_COMPATIBLE_MAX_TOKENS`, and `PLC_OPENAI_COMPATIBLE_CONTEXT_LENGTH`.
 
-All MiniMax variants share one `MINIMAX_API_KEY`; switch models by changing `PLC_MODEL` only. Gemini uses the OpenAI-compatible endpoint; the 2.5 series runs the full tool loop (Gemini 3.x entries are still experimental because they require `thought_signature` round-tripping in the embedded adapter).
+All MiniMax variants share one `MINIMAX_API_KEY`; switch models by changing `PLC_MODEL` only. Gemini uses the OpenAI-compatible endpoint; `gemini-3.5-flash` and `gemini-3.1-pro` are verified alongside the 2.5 series.
 
 Example custom endpoint:
 
@@ -117,13 +120,12 @@ You can also paste or edit ST directly in the left editor and click **Start** to
 
 ## UI overview
 
-- **Top bar** — workspace path (✏ to edit, Enter to switch), PLC status badge, Start / Stop buttons, WS connection indicator.
-- **Left column** — ST source editor (CodeMirror, with ST syntax highlighting; edit + Save to write back to the workspace file).
-- **Center column** — ladder diagram via React Flow (contact / coil / timer / counter / comparator / power rail). Falls back to a source-preview box when a construct isn't representable as ladder.
-- **Right column** — tabs: **Chat** (Agent conversation), **Vars** (live values, 500 ms polling), **过程仿真** (native simulation animated by PLC values).
-- **Bottom panel** — logs (tool calls / runtime / state changes / errors, color-coded).
-
-All column edges and the bottom panel are draggable to resize.
+- **Top bar** — workspace path (✏ to edit, Enter to switch), PLC status badge, Start / Stop buttons, WS connection indicator, layout toggle.
+- **Left panel** — **Chat** (Agent conversation). Collapsible; defaults to 35% width (draggable between 20–50%).
+- **Right canvas** — two tab groups:
+  - **Main tabs**: **Code** (ST editor — CodeMirror with ST syntax highlighting; edit + Save writes back to the workspace file) and **Ladder** (React Flow diagram: contact / coil / timer / counter / comparator / power rail, with a source-preview fallback for constructs not representable as ladder).
+  - **Secondary tabs**: **过程仿真** (native simulation animated by PLC values), **Vars** (live values, 500 ms polling), **Logs** (tool calls / runtime / state changes / errors, color-coded).
+- The canvas supports two layouts — stacked (main over secondary) or side-by-side columns — toggled from the top bar and remembered in `localStorage`. All panel edges are draggable to resize.
 
 The **过程仿真** tab uses the native SimRuntime (a Scene Spec + parts library, animated live from PLC values). The Agent generates it via `plc_buildSimulation` (writes `config/scene.json`); no extra container or service is needed.
 
@@ -168,8 +170,8 @@ A workspace is a single local directory (= `SemaCore.workingDir`), set via `--wo
 ## Tests
 
 ```bash
-npm test                                  # sema-plc-web: 224 tests (server: vitest/node, frontend: vitest/jsdom)
-( cd ../sema-plc-tools && npm test )      # @sema/plc-tools: 542 tests
+npm test                                  # sema-plc-web: 314 tests (server: vitest/node, frontend: vitest/jsdom)
+( cd ../sema-plc-tools && npm test )      # @sema/plc-tools: 555 tests
 ```
 
 ## Troubleshooting

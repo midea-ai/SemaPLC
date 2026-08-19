@@ -24,7 +24,7 @@ Tabs of `ArtifactCanvas`:
 
 ### ST Language Support (`src/lang/`)
 
-A Lezer-based ST grammar (`st.grammar`) provides CodeMirror syntax highlighting and auto-completion; `st-hover` / `st-docs` provide documentation data (the hover tooltip is not yet wired into the editor, while the completion info panel is live).
+A Lezer-based ST grammar (`st.grammar`) provides CodeMirror syntax highlighting and auto-completion; `st-docs` provides documentation data, surfaced through the completion info panel (the earlier `st-hover` hover-tooltip module was removed in the language-service refactor).
 
 ### Chat Panel (`src/components/left/`)
 
@@ -36,7 +36,7 @@ A Lezer-based ST grammar (`st.grammar`) provides CodeMirror syntax highlighting 
 
 ### State Management (`src/store/`)
 
-zustand, split by domain: `agent` / `editor` / `logs` / `model` / `plc` / `sim` / `workspace`. The WS client lives in `src/ws/client.ts`; it connects at startup and dispatches messages into the individual stores.
+zustand, split by domain: `agent` / `editor` / `engine` / `logs` / `model` / `plc` / `sim` / `workspace` (`engine` holds container-engine availability; it is not dispatched over WS, and the browser build stays at `unknown`). The WS client lives in `src/ws/client.ts`; it connects at startup and dispatches messages into the individual stores.
 
 ## Directory at a Glance
 
@@ -49,10 +49,14 @@ src/
 │   ├── center/   CodeView / CodeEditor / LadderCanvas / LadderRungView
 │   ├── right/    VariableMonitor
 │   └── sim/      SimRuntime / parts / partsCatalog / layout / resolveEffect
+├── entries/      chat.tsx (VSCode sidebar entry, vite's second build input)
 ├── ladder-nodes/ ladder diagram React Flow custom nodes
 ├── transformer/  ST → ladder diagram pipeline
 ├── lang/         Lezer ST grammar + CodeMirror integration
+├── models/       PLC and ladder-diagram data type definitions
 ├── store/        zustand stores
+├── lib/          utilities (codeHighlight etc.)
 ├── i18n/         localization and scenario copy
+├── styles/       stylesheets
 └── ws/           WebSocket client
 ```
