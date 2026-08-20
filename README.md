@@ -7,6 +7,7 @@
 </p>
 
 <p align="center">
+  <a href="https://arxiv.org/abs/2608.18565"><img src="https://img.shields.io/badge/arXiv-2608.18565-b31b1b.svg" alt="arXiv" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT" /></a>
   <a href="https://nodejs.org"><img src="https://img.shields.io/badge/node-%3E%3D18-brightgreen.svg" alt="Node.js Version" /></a>
   <img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg" alt="PRs Welcome" />
