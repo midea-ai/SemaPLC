@@ -46,6 +46,7 @@
 | **行为验证** | Agent 强制 `%I` 输入、随时间采样变量,以证明定时器 / 状态机 / 计数器确实按需求行为 —— 不只是"能编译过"。 |
 | **过程仿真** | 原生 Scene-Spec 仿真,用一个被实时 PLC 值驱动的对象模型(传送带、水箱、电机)做动画。 |
 | **MCP 服务 + CLI** | 16 个可组合工具(`plc_check`、`plc_compile`、`plc_buildAndRun`、`plc_readVariables`、`plc_forceVariables`、`plc_trace` …)—— 任何支持 MCP 的 agent 可用,也可经 `sema-plc-tools` CLI 在终端直接调用。 |
+| **Agent 插件** | 一键接入 **QwenPaw**(技能 + `/semaplc` 命令)、**Claude Code**(插件 + 市场:MCP 服务、`/semaplc`、技能)与 **Cursor**(全局 MCP 安装脚本 + 项目规则与技能)。 |
 | **OpenPLC Runtime v4** | 经 OpenPLC + matiec 的真实 IEC 61131-3 执行环境,打包为一条命令即可启动的 Docker 环境。 |
 
 <a id="the-sema-family"></a>
@@ -99,6 +100,23 @@ node dist/cli.js serve                                 # 改以 MCP stdio 服务
 ```
 
 完整命令与工具清单见 [`sema-plc-tools/README.md`](sema-plc-tools/README.md)。
+
+## 🔌 接入自己的 Agent(QwenPaw · Claude Code · Cursor)
+
+同一套 PLC 工具链以三个官方插件形态交付 —— 共享同一份权威技能(`skills/semaplc/`)与一个首次启动自动构建 `dist/` 的 MCP 启动包装:
+
+```bash
+# QwenPaw — 技能 + /semaplc 命令(MCP 经控制台导入:/semaplc mcp 输出配置)
+qwenpaw plugin install ./qwenpaw-plugin
+
+# Claude Code — 仓库根同时就是插件市场
+#   /plugin marketplace add midea-ai/SemaPLC   →   /plugin install semaplc@semaplc
+
+# Cursor — 全局注册 MCP 服务 + 复制技能
+cd cursor-plugin && ./install.sh
+```
+
+平台细节与排错见 **[docs/wiki/tools/agent-plugins.md](docs/wiki/tools/agent-plugins.md)**(英文版 [docs/en/wiki/tools/agent-plugins.md](docs/en/wiki/tools/agent-plugins.md))。
 
 ## 🚀 快速开始
 
@@ -164,12 +182,19 @@ PLC_MODEL=openai ./dev.sh
 │   ├── templates/        # 工作区种子:AGENTS.md + .sema skills + .mcp.json
 │   └── dev.sh            # 一条命令启动器(Docker → 构建 → dev server)
 │
-└── sema-plc-tools/       # MCP 工具链 + OpenPLC 运行时
-    ├── src/              # 16 个工具,经 MCP 服务 + CLI 暴露(check/compile/run/read/force/trace/…)
-    └── runtime/          # OpenPLC Runtime v4 Docker 环境
-        ├── docker-compose.yml
-        ├── Dockerfile.plc-dev
-        └── samples/      # 示例 ST 程序
+├── sema-plc-tools/       # MCP 工具链 + OpenPLC 运行时
+│   ├── src/              # 16 个工具,经 MCP 服务 + CLI 暴露(check/compile/run/read/force/trace/…)
+│   └── runtime/          # OpenPLC Runtime v4 Docker 环境
+│       ├── docker-compose.yml
+│       ├── Dockerfile.plc-dev
+│       └── samples/      # 示例 ST 程序
+│
+└── Agent 插件            # QwenPaw / Claude Code / Cursor 集成
+    ├── qwenpaw-plugin/   # QwenPaw 插件(plugin.json + plugin.py + 技能 + /semaplc)
+    ├── cursor-plugin/    # Cursor 安装脚本(全局 MCP 合并)+ 项目 mcp 模板
+    ├── .claude-plugin/   # Claude Code 插件与市场清单(仓库根即插件)
+    ├── commands/ skills/ .mcp.json .cursor/   # 插件组件(工作流命令、技能、MCP、规则)
+    └── scripts/          # semaplc-mcp.sh(MCP 启动包装,自动构建)· sync-plugin-skills.sh
 ```
 
 ## 🧪 测试

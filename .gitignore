@@ -65,3 +65,7 @@ docs/*
 !docs/.nojekyll
 !docs/wiki/
 !docs/en/
+
+# Python bytecode
+__pycache__/
+*.pyc

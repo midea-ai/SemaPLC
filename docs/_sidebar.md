@@ -7,6 +7,7 @@
 - **工具链 sema-plc-tools**
   - [MCP 工具参考](wiki/tools/mcp-tools)
   - [独立 CLI](wiki/tools/cli)
+  - [Agent 插件支持](wiki/tools/agent-plugins)
   - 核心机制
     - [编译与部署管线](wiki/tools/compile-pipeline)
     - [语法检查与 IO 检测](wiki/tools/check-and-io)

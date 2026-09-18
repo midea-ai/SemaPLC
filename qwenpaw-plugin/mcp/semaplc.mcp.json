@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "plc-tools": {
+      "command": "bash",
+      "args": ["/ABS/PATH/TO/SemaPLC/scripts/semaplc-mcp.sh", "serve"],
+      "env": {
+        "PLC_URL": "https://localhost:8443",
+        "PLC_CONTAINER": "openplc-plc-dev"
+      }
+    }
+  }
+}
