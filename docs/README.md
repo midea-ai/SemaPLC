@@ -54,3 +54,4 @@ Agent 基于 `sema-plc-tools` 里的 MCP 工具进行推理;同一套工具也�
 - [架构设计](wiki/overview/architecture) —— 各组件如何协作
 - [MCP 工具清单](wiki/tools/mcp-tools) —— 16 个 PLC 工具的完整参考
 - [独立 CLI](wiki/tools/cli) —— 不依赖 Agent 直接驱动 OpenPLC
+- [Agent 插件支持](wiki/tools/agent-plugins) —— QwenPaw / Claude Code / Cursor 一键接入

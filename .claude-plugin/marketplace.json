@@ -1,0 +1,39 @@
+{
+  "name": "semaplc",
+  "owner": {
+    "name": "midea-ai",
+    "url": "https://github.com/midea-ai"
+  },
+  "metadata": {
+    "description": "SemaPLC: the PLC toolchain plugin (plc-tools MCP server + ST authoring/verification skill)."
+  },
+  "description": "SemaPLC: the PLC toolchain plugin (plc-tools MCP server + ST authoring/verification skill).",
+  "version": "0.1.0",
+  "plugins": [
+    {
+      "name": "semaplc",
+      "source": "./",
+      "description": "Author, verify and simulate IEC 61131-3 ST PLC programs against a local OpenPLC Runtime v4. Ships the plc-tools MCP server (16 composable tools), the /semaplc workflow command and the semaplc skill.",
+      "version": "0.1.0",
+      "author": {
+        "name": "midea-ai"
+      },
+      "homepage": "https://midea-ai.github.io/SemaPLC/",
+      "repository": "https://github.com/midea-ai/SemaPLC",
+      "license": "MIT",
+      "category": "productivity",
+      "keywords": [
+        "plc",
+        "iec61131",
+        "structured-text",
+        "openplc",
+        "industrial-automation"
+      ],
+      "tags": [
+        "plc",
+        "mcp",
+        "skills"
+      ]
+    }
+  ]
+}

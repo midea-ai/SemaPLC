@@ -7,6 +7,7 @@
 - **Toolchain: sema-plc-tools**
   - [MCP Tools Reference](en/wiki/tools/mcp-tools)
   - [Standalone CLI](en/wiki/tools/cli)
+  - [Agent Plugin Support](en/wiki/tools/agent-plugins)
   - Internals
     - [Compile & Deploy Pipeline](en/wiki/tools/compile-pipeline)
     - [Syntax Check & IO Detection](en/wiki/tools/check-and-io)

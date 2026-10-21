@@ -96,6 +96,8 @@ Point the agent workspace's `.sema/.mcp.json` at this package's `dist/cli.js`:
 
 `sema-plc-web` consumes this package directly (relative-imports `dist/`), so when you run the IDE it wires this MCP server up for you.
 
+For **QwenPaw / Claude Code / Cursor**, the repo ships ready-made plugin packages (skill + workflow command + MCP config) — see [`docs/wiki/tools/agent-plugins.md`](../docs/wiki/tools/agent-plugins.md) and the root README's *Use with your own agent* section. They all launch this server through `scripts/semaplc-mcp.sh`, which auto-builds `dist/` on first start.
+
 ## 5. The 16 tools
 
 | Group | Tools |

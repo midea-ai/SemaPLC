@@ -44,7 +44,7 @@ elif docker ps -a --format '{{.Names}}' | grep -qx openplc-plc-dev; then
   echo "[dev.sh] start 已存在的容器 openplc-plc-dev"
   docker start openplc-plc-dev
 else
-  ( cd "$ROOT/sema-plc-tools/runtime" && docker-compose up -d )
+  ( cd "$ROOT/sema-plc-tools/runtime" && docker compose up -d )
 fi
 
 # ② 重新编译 plc-tools(源码改过必须 build;没改其实可跳,留着保险)

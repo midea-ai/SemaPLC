@@ -54,3 +54,4 @@ The Agent reasons over the MCP tools in `sema-plc-tools`; the same tools back th
 - [Architecture](en/wiki/overview/architecture) — how the components work together
 - [MCP Tool Reference](en/wiki/tools/mcp-tools) — the full reference for the 16 PLC tools
 - [Standalone CLI](en/wiki/tools/cli) — drive OpenPLC directly, no agent required
+- [Agent Plugin Support](en/wiki/tools/agent-plugins) — one-click QwenPaw / Claude Code / Cursor integrations

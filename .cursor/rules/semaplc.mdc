@@ -1,0 +1,15 @@
+---
+description: SemaPLC PLC 工作流规则 — 涉及 ST/PLC/OpenPLC 任务时如何调用 plc-tools
+globs:
+alwaysApply: false
+---
+
+# SemaPLC(本仓库)
+
+处理 PLC / IEC 61131-3 ST / 梯形图 / OpenPLC 相关任务时,使用 SemaPLC 工具链,不要凭空编译。
+
+- CLI:`node <本仓库根>/sema-plc-tools/dist/cli.js <command>`(MCP 已注册时优先用 `plc_*` 工具,`plc_status` 探活;`dist/` 缺失时可用 `bash <本仓库根>/scripts/semaplc-mcp.sh <command>`,首次自动构建)。
+- 完整工作流(写 ST → 编译 → 部署运行 → force/trace 观测 → `verify plan.json` 断言 → `plc_buildSimulation` 过程画面)见仓库根 `skills/semaplc/SKILL.md`。
+- 前置:`cd sema-plc-tools && npm install && npm run build`;运行时容器 `cd sema-plc-tools/runtime && docker compose up -d --build`(OpenPLC v4,REST `https://localhost:8443`,自签证书)。
+- 编译错误必须按结构化 `errors[]`(行/列 + 源码行)修复后重跑;`verify` 拿到 `ok:true` 才算完成。
+- 工作目录约定 `/tmp/plc-ver-ws`;单文件恰好一个 `PROGRAM` + 一个 `CONFIGURATION`。

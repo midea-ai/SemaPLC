@@ -1,0 +1,20 @@
+{
+  "id": "semaplc",
+  "name": "semaplc",
+  "version": "0.1.0",
+  "type": "general",
+  "description": "SemaPLC PLC toolchain: the semaplc ST authoring/verification skill plus the /semaplc entry command, wired to the plc-tools CLI or MCP server and a local OpenPLC Runtime v4.",
+  "description_i18n": {
+    "zh-CN": "SemaPLC PLC 工具链:semaplc ST 编写/验证技能 + /semaplc 入口命令,对接 plc-tools CLI 或 MCP 服务与本地 OpenPLC Runtime v4。",
+    "en-US": "SemaPLC PLC toolchain: the semaplc ST authoring/verification skill plus the /semaplc entry command, wired to the plc-tools CLI or MCP server and a local OpenPLC Runtime v4."
+  },
+  "author": "midea-ai",
+  "entry": {
+    "backend": "plugin.py"
+  },
+  "dependencies": [],
+  "qwenpaw_version": {
+    "min": "2.1.0",
+    "max": "2.99.0"
+  }
+}

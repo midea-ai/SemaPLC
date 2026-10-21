@@ -46,6 +46,7 @@ The repository ships two products that work together:
 | **Behavior verification** | The Agent forces `%I` inputs and traces variables over time to prove timers / state-machines / counters actually behave as specified — not just that the code compiles. |
 | **Process simulation** | A native Scene-Spec simulation animates a plant model (conveyors, tanks, motors) driven by live PLC values. |
 | **MCP server + CLI** | 16 composable tools (`plc_check`, `plc_compile`, `plc_buildAndRun`, `plc_readVariables`, `plc_forceVariables`, `plc_trace`, …) — usable by any MCP-capable agent, or directly from the terminal via the `sema-plc-tools` CLI. |
+| **Agent plugins** | One-click integrations for **QwenPaw** (skill + `/semaplc` command), **Claude Code** (plugin + marketplace: MCP server, `/semaplc`, skill) and **Cursor** (global MCP installer, project rule + skill). |
 | **OpenPLC Runtime v4** | Real IEC 61131-3 execution via OpenPLC + matiec, packaged as a one-command Docker environment. |
 
 <a id="the-sema-family"></a>
@@ -99,6 +100,23 @@ node dist/cli.js serve                                 # run as an MCP stdio ser
 ```
 
 See [`sema-plc-tools/README.md`](sema-plc-tools/README.md) for the full command and tool reference.
+
+## 🔌 Use with your own agent (QwenPaw · Claude Code · Cursor)
+
+The same PLC toolchain ships as three installable plugin packages — all sharing one canonical skill (`skills/semaplc/`) and one MCP launch wrapper that builds `dist/` on first start:
+
+```bash
+# QwenPaw — skill + /semaplc command (then import MCP via the console: /semaplc mcp)
+qwenpaw plugin install ./qwenpaw-plugin
+
+# Claude Code — repo root is also the plugin marketplace
+#   /plugin marketplace add midea-ai/SemaPLC   →   /plugin install semaplc@semaplc
+
+# Cursor — register the MCP server globally + copy the skill
+cd cursor-plugin && ./install.sh
+```
+
+Details, per-platform notes and troubleshooting: **[docs/wiki/tools/agent-plugins.md](docs/en/wiki/tools/agent-plugins.md)** (also in [中文](docs/wiki/tools/agent-plugins.md)).
 
 ## 🚀 Quick Start
 
@@ -164,12 +182,19 @@ Open **<http://localhost:5173>** and describe a control requirement in the chat 
 │   ├── templates/        # workspace seed: AGENTS.md + .sema skills + .mcp.json
 │   └── dev.sh            # one-command launcher (Docker → build → dev server)
 │
-└── sema-plc-tools/       # MCP toolchain + OpenPLC runtime
-    ├── src/              # 16 tools, exposed via MCP server + CLI (check/compile/run/read/force/trace/…)
-    └── runtime/          # OpenPLC Runtime v4 Docker environment
-        ├── docker-compose.yml
-        ├── Dockerfile.plc-dev
-        └── samples/      # example ST programs
+├── sema-plc-tools/       # MCP toolchain + OpenPLC runtime
+│   ├── src/              # 16 tools, exposed via MCP server + CLI (check/compile/run/read/force/trace/…)
+│   └── runtime/          # OpenPLC Runtime v4 Docker environment
+│       ├── docker-compose.yml
+│       ├── Dockerfile.plc-dev
+│       └── samples/      # example ST programs
+│
+└── agent plugins         # QwenPaw / Claude Code / Cursor integrations
+    ├── qwenpaw-plugin/   # QwenPaw plugin (plugin.json + plugin.py + skill + /semaplc)
+    ├── cursor-plugin/    # Cursor installer (global MCP merge) + project mcp template
+    ├── .claude-plugin/   # Claude Code plugin + marketplace manifests (repo root = plugin)
+    ├── commands/ skills/ .mcp.json .cursor/   # plugin components (workflow command, skill, MCP, rule)
+    └── scripts/          # semaplc-mcp.sh (MCP launch wrapper, auto-builds) · sync-plugin-skills.sh
 ```
 
 ## 🧪 Tests
